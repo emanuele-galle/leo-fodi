@@ -1,108 +1,112 @@
 import type { BaseExtractor } from './base-extractor'
 import type { LeadSearchParams, Lead } from '@/lib/types/lead-extraction'
-import { callScrapeCreators } from '@/lib/scrapecreators/client'
 import { generateLeadId } from './base-extractor'
-import { calculateAffidabilitaScore, validateEmail } from '../extraction-worker'
+import { calculateAffidabilitaScore } from '../extraction-worker'
 
 export const linkedinExtractor: BaseExtractor = {
-  name: 'LinkedIn (ScrapeCreators)',
+  name: 'LinkedIn (Apify)',
   tipo: 'social',
 
   async extract(params: LeadSearchParams): Promise<Lead[]> {
-    if (!process.env.SCRAPECREATORS_API_KEY) {
-      console.log('[LinkedIn] ⏭️  Skipped: SCRAPECREATORS_API_KEY not configured')
+    const apiToken = process.env.APIFY_API_TOKEN
+    if (!apiToken) {
+      console.warn('[LinkedIn] APIFY_API_TOKEN not configured')
       return []
     }
 
     const leads: Lead[] = []
 
     try {
-      // Step 1: Search for multiple LinkedIn company URLs using Google Search
-      const searchQuery = `${params.name} ${params.comune || params.provincia || ''} site:linkedin.com/company`
-      console.log(`[LinkedIn] 🔍 Searching: "${searchQuery}"`)
+      // Cerca aziende LinkedIn per settore e location
+      const query = `${params.settore} ${params.comune || params.provincia || params.regione || 'Italia'}`
+      console.log(`[LinkedIn] 🔍 Searching: "${query}"`)
 
-      const searchResult = await callScrapeCreators<{ results: { url: string }[] }>(
-        'google/search',
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/dev_fusion~Linkedin-Company-Scraper/runs?token=${apiToken}`,
         {
-          query: searchQuery,
-          num_results: 10, // CHANGED: Get up to 10 LinkedIn profiles
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            searchKeywords: [query],
+            maxItems: Math.min(params.limite || 30, 50),
+          }),
         }
       )
 
-      if (!searchResult.results || searchResult.results.length === 0) {
-        console.log(`[LinkedIn] ❌ No company pages found for: ${params.name}`)
+      if (!runRes.ok) {
+        console.error(`[LinkedIn] Failed to start run: ${runRes.status} ${runRes.statusText}`)
         return []
       }
 
-      // Filter only valid LinkedIn company URLs
-      const linkedinUrls = searchResult.results
-        .map(r => r.url)
-        .filter(url => url && url.includes('linkedin.com/company'))
-        .slice(0, 5) // Limit to 5 companies to avoid excessive API costs
+      const run = await runRes.json()
+      const runId = run.data?.id
+      if (!runId) {
+        console.error('[LinkedIn] No runId returned')
+        return []
+      }
 
-      console.log(`[LinkedIn] ✅ Found ${linkedinUrls.length} company pages`)
+      console.log(`[LinkedIn] Run started: ${runId}`)
 
-      // Step 2: Extract data from each company page
-      for (const linkedinUrl of linkedinUrls) {
-        try {
-          console.log(`[LinkedIn] 📝 Extracting: ${linkedinUrl}`)
+      // Polling (max 2 min)
+      for (let i = 0; i < 24; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        const statusRes = await fetch(
+          `https://api.apify.com/v2/actor-runs/${runId}?token=${apiToken}`
+        )
+        const s = await statusRes.json()
+        const status = s.data?.status
 
-          const companyData = await callScrapeCreators<any>('linkedin/company', {
-            url: linkedinUrl,
-          })
+        console.log(`[LinkedIn] Run ${runId} status: ${status} (attempt ${i + 1}/24)`)
 
-          if (!companyData || !companyData.name) {
-            console.warn(`[LinkedIn] ⚠️  No data from ${linkedinUrl}`)
-            continue
-          }
-
-          console.log(`[LinkedIn] ✅ Extracted: ${companyData.name}`)
-
-          // Step 3: Map data to Lead interface
-          const lead: Lead = {
-            id: generateLeadId(),
-            search_id: '', // Will be set by worker
-            ragione_sociale: companyData.name,
-            linkedin_url: linkedinUrl,
-            sito_web: companyData.website,
-            indirizzo: companyData.headquarters,
-            citta: companyData.location?.city || params.comune,
-            provincia: companyData.location?.state || params.provincia,
-            dipendenti: companyData.employeeCount,
-            settore: companyData.industry || params.settore,
-            descrizione: companyData.description?.substring(0, 500),
-            anno_fondazione: companyData.founded,
-
-            // Metadata
-            fonte_primaria: 'linkedin_scrapecreators',
-            fonti_consultate: ['linkedin_scrapecreators'],
-            validazione_status: 'pending',
-            data_estrazione: new Date().toISOString(),
-            attivo: true,
-            da_contattare: true,
-            priorita: 'alta', // LinkedIn B2B = high priority
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-
-            // --- RAW DATA STORAGE ---
-            raw_data_sc: companyData,
-          }
-
-          lead.affidabilita_score = calculateAffidabilitaScore(lead)
-
-          console.log(
-            `[LinkedIn] ✅ Lead created: ${lead.ragione_sociale} (score: ${lead.affidabilita_score})`
-          )
-
-          leads.push(lead)
-
-          // Rate limiting: wait 500ms between API calls
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-        } catch (error: any) {
-          console.error(`[LinkedIn] ❌ Error extracting ${linkedinUrl}: ${error.message}`)
-          continue
+        if (status === 'SUCCEEDED') break
+        if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+          console.error(`[LinkedIn] Run ended with status: ${status}`)
+          return []
         }
+      }
+
+      const dataRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${apiToken}&limit=50`
+      )
+      const items = await dataRes.json()
+
+      if (!Array.isArray(items)) {
+        console.error('[LinkedIn] Unexpected dataset format')
+        return []
+      }
+
+      console.log(`[LinkedIn] Got ${items.length} results from Apify`)
+
+      const now = new Date().toISOString()
+
+      for (const item of items as Record<string, unknown>[]) {
+        const lead: Lead = {
+          id: generateLeadId(),
+          search_id: '',
+          ragione_sociale: String(item.name || item.companyName || ''),
+          sito_web: String(item.website || item.websiteUrl || ''),
+          indirizzo: String(item.headquarters || item.location || ''),
+          settore: params.settore,
+          fonte_primaria: 'linkedin_apify',
+          fonti_consultate: ['linkedin_apify'],
+          validazione_status: 'pending',
+          data_estrazione: now,
+          attivo: true,
+          da_contattare: true,
+          priorita: 'alta',
+          created_at: now,
+          updated_at: now,
+          extra_data: {
+            linkedinUrl: item.linkedinUrl,
+            employees: item.employees,
+            industry: item.industry,
+          },
+        } as Lead
+
+        lead.affidabilita_score = calculateAffidabilitaScore(lead)
+
+        console.log(`[LinkedIn] ✅ Lead created: ${lead.ragione_sociale} (score: ${lead.affidabilita_score})`)
+        leads.push(lead)
       }
 
       console.log(`[LinkedIn] 🎯 Total leads extracted: ${leads.length}`)
@@ -110,7 +114,7 @@ export const linkedinExtractor: BaseExtractor = {
 
     } catch (error: any) {
       console.error(`[LinkedIn Extractor] ❌ Fatal error: ${error.message}`)
-      return leads // Return any leads we managed to extract
+      return leads
     }
   },
 }

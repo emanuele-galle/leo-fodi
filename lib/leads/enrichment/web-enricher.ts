@@ -13,7 +13,6 @@
 import type { Lead } from '@/lib/types/lead-extraction'
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { callScrapeCreators } from '@/lib/scrapecreators/client'
 
 interface WebEnrichmentResult {
   sito_web?: string
@@ -135,59 +134,40 @@ async function searchWebForCompany(lead: Lead): Promise<string[]> {
 
   const results: { title: string; link: string; snippet: string }[] = []
 
+  const apiToken = process.env.APIFY_API_TOKEN
+  if (!apiToken) {
+    console.warn('[WebEnrichment] ⚠️  APIFY_API_TOKEN not configured, skipping web search')
+    return results.map((r: any) => `${r.title}\n${r.link}\n${r.snippet}`)
+  }
+
   for (const query of searchQueries) {
     try {
-      // Try ScrapeCreators first (preferred method)
-      if (process.env.SCRAPECREATORS_API_KEY) {
-        console.log(`[WebEnrichment] 🔍 Searching: "${query}"`)
+      console.log(`[WebEnrichment] 🔍 Searching via Apify: "${query}"`)
 
-        const response = await callScrapeCreators<{ results: any[] }>('google/search', {
-          query: query,
-          num_results: 3, // Top 3 results per query (optimized)
-        })
-
-        if (response.results) {
-          results.push(
-            ...response.results.map((item: any) => ({
-              title: item.title,
-              link: item.url, // ScrapeCreators uses 'url' instead of 'link'
-              snippet: item.snippet,
-            }))
-          )
+      const response = await fetch(
+        'https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=' + apiToken,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, maxResults: 3, outputFormats: ['markdown'] }),
+          signal: AbortSignal.timeout(20000),
         }
-      }
-      // Fallback to Google Custom Search API if ScrapeCreators not available
-      else if (process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID) {
-        console.log(`[WebEnrichment] 🔍 Searching via Google Custom Search: "${query}"`)
+      )
 
-        const response = await axios.get(
-          'https://www.googleapis.com/customsearch/v1',
-          {
-            params: {
-              key: process.env.GOOGLE_SEARCH_API_KEY,
-              cx: process.env.GOOGLE_SEARCH_ENGINE_ID,
-              q: query,
-              num: 5,
-            },
-            timeout: 30000,
-          }
+      if (response.ok) {
+        const items = await response.json() as Array<{url?: string; title?: string; markdown?: string; text?: string}>
+        results.push(
+          ...items.map((item: any) => ({
+            title: item.title || '',
+            link: item.url || '',
+            snippet: (item.markdown || item.text || '').slice(0, 300),
+          }))
         )
-
-        if (response.data.items) {
-          results.push(
-            ...response.data.items.map((item: any) => ({
-              title: item.title,
-              link: item.link,
-              snippet: item.snippet,
-            }))
-          )
-        }
       } else {
-        console.warn('[WebEnrichment] ⚠️  No search API configured (ScrapeCreators or Google Custom Search), skipping web search')
-        break // No point trying other queries
+        console.warn(`[WebEnrichment] ⚠️  Apify search failed for "${query}": ${response.statusText}`)
       }
 
-      // Rate limiting (optimized)
+      // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 200))
     } catch (error: any) {
       console.error(`[WebEnrichment] ❌ Error searching for "${query}": ${error.message}`)
@@ -345,7 +325,7 @@ async function extractWebEnrichmentData(lead: Lead, webResults: string[]): Promi
  * Scrapes website content and uses AI to extract ALL contact info
  */
 async function analyzeWebsiteWithAI(lead: Lead, websiteUrl: string): Promise<WebEnrichmentResult> {
-  const apiKey = process.env.XAI_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
 
   try {
     console.log(`[WebEnrichment] 📥 Fetching website content...`)
@@ -414,9 +394,9 @@ JSON OUTPUT:
 Estrai TUTTO ciò che trovi! Anche numeri/email nel footer, contatti, etc.`
 
     const aiResponse = await axios.post(
-      `${process.env.XAI_API_URL || 'https://api.x.ai/v1'}/chat/completions`,
+      'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: process.env.XAI_MODEL || 'grok-beta',
+        model: 'anthropic/claude-haiku-4-5-20251001',
         messages: [
           {
             role: 'system',
@@ -434,6 +414,8 @@ Estrai TUTTO ciò che trovi! Anche numeri/email nel footer, contatti, etc.`
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://leo-fodi.fodivps2.cloud',
+          'X-Title': 'LEO-FODI',
         },
         timeout: 20000,
       }
@@ -517,10 +499,11 @@ function extractFromWebsiteBasic($: any, pageText: string, allLinks: string[]): 
  * Searches for PERSONAL profiles on LinkedIn/Facebook and analyzes bio
  */
 async function findPersonalSocialProfiles(lead: Lead, currentData: WebEnrichmentResult): Promise<WebEnrichmentResult> {
-  const apiKey = process.env.XAI_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
 
-  if (!process.env.SCRAPECREATORS_API_KEY) {
-    console.log('[WebEnrichment] ⚠️  ScrapeCreators not configured, skipping personal profile search')
+  const apifyToken = process.env.APIFY_API_TOKEN
+  if (!apifyToken) {
+    console.log('[WebEnrichment] ⚠️  APIFY_API_TOKEN not configured, skipping personal profile search')
     return { sources_found: [] }
   }
 
@@ -531,27 +514,36 @@ async function findPersonalSocialProfiles(lead: Lead, currentData: WebEnrichment
 
     console.log(`[WebEnrichment] 🔍 Searching for: ${personName}`)
 
-    // Search for personal profiles
+    // Search for personal profiles via Apify RAG
     const searchQuery = `${personName} ${lead.settore} ${lead.citta || ''} facebook OR linkedin`
 
-    const response = await callScrapeCreators<{ results: any[] }>('google/search', {
-      query: searchQuery.trim(),
-      num_results: 5,
-    })
+    const searchRes = await fetch(
+      'https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=' + apifyToken,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery.trim(), maxResults: 5, outputFormats: ['markdown'] }),
+        signal: AbortSignal.timeout(20000),
+      }
+    )
 
-    if (!response.results || response.results.length === 0) {
+    const apifyItems = searchRes.ok
+      ? (await searchRes.json() as Array<{url?: string; title?: string; markdown?: string; text?: string}>)
+      : []
+
+    if (!apifyItems || apifyItems.length === 0) {
       console.log('[WebEnrichment] ⚠️  No personal profiles found')
       return { sources_found: [] }
     }
 
-    const searchResults = response.results.map((item: any) =>
-      `${item.title}\n${item.url}\n${item.snippet}`
+    const searchResults = apifyItems.map((item) =>
+      `${item.title || ''}\n${item.url || ''}\n${(item.markdown || item.text || '').slice(0, 300)}`
     ).join('\n---\n')
 
     if (!apiKey) {
       // Fallback: basic regex
-      const linkedinPersonal = response.results.find((r: any) => r.url.includes('linkedin.com/in/'))
-      const facebookPersonal = response.results.find((r: any) => r.url.includes('facebook.com/') && !r.url.includes('/company'))
+      const linkedinPersonal = apifyItems.find((r) => (r.url || '').includes('linkedin.com/in/'))
+      const facebookPersonal = apifyItems.find((r) => (r.url || '').includes('facebook.com/') && !(r.url || '').includes('/company'))
 
       return {
         linkedin_url: linkedinPersonal?.url,
@@ -587,9 +579,9 @@ JSON OUTPUT:
 IMPORTANTE: Solo se SEI SICURO che è la persona giusta!`
 
     const aiResponse = await axios.post(
-      `${process.env.XAI_API_URL || 'https://api.x.ai/v1'}/chat/completions`,
+      'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: process.env.XAI_MODEL || 'grok-beta',
+        model: 'anthropic/claude-haiku-4-5-20251001',
         messages: [
           {
             role: 'system',
@@ -607,6 +599,8 @@ IMPORTANTE: Solo se SEI SICURO che è la persona giusta!`
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://leo-fodi.fodivps2.cloud',
+          'X-Title': 'LEO-FODI',
         },
         timeout: 20000,
       }
@@ -655,11 +649,10 @@ async function enrichWithAI(
   enrichmentData: WebEnrichmentResult,
   webResults: string[]
 ): Promise<WebEnrichmentResult> {
-  const apiKey = process.env.XAI_API_KEY
-  const apiUrl = process.env.XAI_API_URL || 'https://api.x.ai/v1'
+  const apiKey = process.env.OPENROUTER_API_KEY
 
   if (!apiKey) {
-    console.warn('[WebEnrichment] XAI_API_KEY not configured, skipping AI analysis')
+    console.warn('[WebEnrichment] OPENROUTER_API_KEY not configured, skipping AI analysis')
     return enrichmentData
   }
 
@@ -693,9 +686,9 @@ JSON (estrai TUTTO ciò che trovi):
 IMPORTANTE: Controlla OGNI risultato, anche snippet e descrizioni per email/telefoni/social!`
 
     const response = await axios.post(
-      `${apiUrl}/chat/completions`,
+      'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: process.env.XAI_MODEL || 'grok-beta',
+        model: 'anthropic/claude-haiku-4-5-20251001',
         messages: [
           {
             role: 'system',
@@ -713,6 +706,8 @@ IMPORTANTE: Controlla OGNI risultato, anche snippet e descrizioni per email/tele
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://leo-fodi.fodivps2.cloud',
+          'X-Title': 'LEO-FODI',
         },
         timeout: 30000, // Reduced from 60s
       }

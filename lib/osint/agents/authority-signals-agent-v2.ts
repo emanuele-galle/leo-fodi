@@ -21,7 +21,7 @@ export class AuthoritySignalsAnalyzerAgentV2 extends BaseOSINTAgent<AuthoritySig
       id: 'authority_signals_v2',
       name: 'Authority Signals Analyzer V2',
       role: 'Analisi segnali di autorità e influenza',
-      model: 'grok-4-fast-non-reasoning',
+      model: 'anthropic/claude-haiku-4-5-20251001',
       temperature: 0.1,
       max_tokens: 1500,
       priority: 2,

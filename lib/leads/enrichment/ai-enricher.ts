@@ -114,11 +114,11 @@ async function extractContactsWithAI(
   websiteContent: string,
   webResults: string
 ): Promise<EnrichmentResult> {
-  const apiKey = process.env.XAI_API_KEY
-  const apiUrl = process.env.XAI_API_URL || 'https://api.x.ai/v1'
+  const apiKey = process.env.OPENROUTER_API_KEY
+  const apiUrl = 'https://openrouter.ai/api/v1'
 
   if (!apiKey) {
-    console.warn('[AI-Enrichment] XAI_API_KEY not configured, skipping AI enrichment')
+    console.warn('[AI-Enrichment] OPENROUTER_API_KEY not configured, skipping AI enrichment')
     return { referenti: [] }
   }
 
@@ -173,7 +173,7 @@ IMPORTANT:
     const response = await axios.post(
       `${apiUrl}/chat/completions`,
       {
-        model: 'grok-4-fast-reasoning',
+        model: 'anthropic/claude-haiku-4-5-20251001',
         messages: [
           {
             role: 'system',
@@ -191,6 +191,8 @@ IMPORTANT:
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://leo-fodi.fodivps2.cloud',
+          'X-Title': 'LEO-FODI',
         },
         timeout: 30000,
       }

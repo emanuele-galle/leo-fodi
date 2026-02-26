@@ -75,13 +75,12 @@ export async function trackTokenUsage(params: TokenUsageParams): Promise<void> {
  * XAI/OpenRouter cost rates per 1k tokens
  */
 export const XAI_COSTS: Record<string, { prompt: number; completion: number }> = {
-  'grok-4-fast-reasoning': { prompt: 0.003, completion: 0.015 },      // $3/1M prompt, $15/1M completion
-  'grok-4-fast-non-reasoning': { prompt: 0.0003, completion: 0.0015 }, // $0.30/1M, $1.50/1M
-  'grok-4-vision': { prompt: 0.0025, completion: 0.010 },              // $2.50/1M, $10/1M
-  'grok-beta': { prompt: 0.005, completion: 0.015 },                   // mantieni per compatibilità
+  'anthropic/claude-sonnet-4': { prompt: 0.003, completion: 0.015 },           // $3/1M prompt, $15/1M completion
+  'anthropic/claude-haiku-4-5-20251001': { prompt: 0.0008, completion: 0.004 }, // $0.80/1M, $4/1M
+  'anthropic/claude-haiku-4-5': { prompt: 0.0008, completion: 0.004 },
+  // legacy fallback entries
+  'grok-beta': { prompt: 0.005, completion: 0.015 },
   'grok-2': { prompt: 0.002, completion: 0.010 },
-  'grok-2-vision': { prompt: 0.002, completion: 0.010 },
-  'grok-3': { prompt: 0.005, completion: 0.015 },
 }
 
 /**

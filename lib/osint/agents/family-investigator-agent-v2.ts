@@ -21,7 +21,7 @@ export class FamilyInvestigatorAgentV2 extends BaseOSINTAgent<FamilyProfile> {
       id: 'family_investigator_v2',
       name: 'Family Investigator V2',
       role: 'Ricerca nucleo familiare con Reflect Loop',
-      model: 'grok-4-fast-non-reasoning',
+      model: 'anthropic/claude-haiku-4-5-20251001',
       temperature: 0.1,
       max_tokens: 2000,
       priority: 1,

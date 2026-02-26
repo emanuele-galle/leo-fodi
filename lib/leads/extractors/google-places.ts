@@ -62,6 +62,12 @@ export const googlePlacesExtractor: BaseExtractor = {
     // Check API key
     const apiKey = process.env.GOOGLE_PLACES_API_KEY
     if (!apiKey) {
+      // Se Google Places non è configurato, usa Apify Google Maps
+      if (process.env.APIFY_API_TOKEN) {
+        console.log('[GooglePlaces] GOOGLE_PLACES_API_KEY not set, falling back to Apify Google Maps')
+        const { apifyGoogleMapsExtractor } = await import('./apify-google-maps')
+        return apifyGoogleMapsExtractor.extract(params)
+      }
       console.error('[GooglePlaces] ❌ GOOGLE_PLACES_API_KEY not configured')
       console.warn('[GooglePlaces] Add GOOGLE_PLACES_API_KEY to .env.local')
       return []

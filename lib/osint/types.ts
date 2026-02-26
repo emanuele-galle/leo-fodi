@@ -386,8 +386,8 @@ export interface CompleteOSINTProfile {
 // ==================== AGENT SYSTEM ====================
 
 export type XAIModel =
-  | 'grok-4-fast-reasoning'      // Fast con reasoning per analisi complesse
-  | 'grok-4-fast-non-reasoning'  // Fast senza reasoning per task semplici
+  | 'anthropic/claude-sonnet-4'          // Reasoning per analisi complesse
+  | 'anthropic/claude-haiku-4-5-20251001' // Veloce per task semplici
 
 export interface AgentConfig {
   id: string

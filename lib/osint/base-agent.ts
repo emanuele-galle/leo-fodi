@@ -1,6 +1,6 @@
 /**
  * Base Agent Class
- * Classe base per tutti gli agent OSINT con integrazione XAI Grok
+ * Classe base per tutti gli agent OSINT con integrazione OpenRouter
  */
 
 import axios from 'axios'
@@ -11,6 +11,7 @@ import type {
   AgentResult,
   ProfilingTarget,
   XAIModel,
+  WebSearchResult,
 } from './types'
 
 export abstract class BaseOSINTAgent<TResult = any> {
@@ -20,11 +21,11 @@ export abstract class BaseOSINTAgent<TResult = any> {
 
   constructor(config: AgentConfig) {
     this.config = config
-    this.apiKey = process.env.XAI_API_KEY || ''
-    this.apiUrl = process.env.XAI_API_URL || 'https://api.x.ai/v1'
+    this.apiKey = process.env.OPENROUTER_API_KEY || ''
+    this.apiUrl = 'https://openrouter.ai/api/v1'
 
     if (!this.apiKey) {
-      console.warn(`[${this.config.id}] ⚠️  XAI_API_KEY not configured`)
+      console.warn(`[${this.config.id}] ⚠️  OPENROUTER_API_KEY not configured`)
     }
   }
 
@@ -66,7 +67,7 @@ export abstract class BaseOSINTAgent<TResult = any> {
   }
 
   /**
-   * Chiamata al modello XAI Grok con supporto Live Search adattivo
+   * Chiamata al modello OpenRouter con supporto parametri standard
    */
   protected async callXAI(
     userMessage: string,
@@ -85,9 +86,9 @@ export abstract class BaseOSINTAgent<TResult = any> {
     const startTime = Date.now()
 
     try {
-      console.log(`[${this.config.id}] 🤖 Calling XAI model: ${this.config.model}`)
+      console.log(`[${this.config.id}] 🤖 Calling OpenRouter model: ${this.config.model}`)
 
-      // ✅ Build request body with optional search_parameters
+      // Build request body (search_parameters not supported on OpenRouter)
       const requestBody: any = {
         model: this.config.model,
         messages: [
@@ -105,12 +106,6 @@ export abstract class BaseOSINTAgent<TResult = any> {
         response_format: options?.response_format,
       }
 
-      // Add search_parameters if provided (XAI Live Search)
-      if (options?.searchParameters) {
-        requestBody.search_parameters = options.searchParameters
-        console.log(`[${this.config.id}] 🔍 XAI Live Search enabled: mode=${options.searchParameters.mode}, max=${options.searchParameters.max_search_results}`)
-      }
-
       const response = await axios.post(
         `${this.apiUrl}/chat/completions`,
         requestBody,
@@ -118,6 +113,8 @@ export abstract class BaseOSINTAgent<TResult = any> {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${this.apiKey}`,
+            'HTTP-Referer': 'https://leo-fodi.fodivps2.cloud',
+            'X-Title': 'LEO-FODI OSINT',
           },
           timeout: 90000, // 90s timeout (increased for complex agents like education profiler)
         }
@@ -128,7 +125,7 @@ export abstract class BaseOSINTAgent<TResult = any> {
       const usage = response.data.usage
 
       console.log(
-        `[${this.config.id}] ✅ XAI response received (${executionTime}ms, ${usage?.total_tokens || 'N/A'} tokens)`
+        `[${this.config.id}] ✅ OpenRouter response received (${executionTime}ms, ${usage?.total_tokens || 'N/A'} tokens)`
       )
 
       // Track token usage in database
@@ -143,7 +140,7 @@ export abstract class BaseOSINTAgent<TResult = any> {
           await trackTokenUsage({
             section: 'osint_profiling',
             operation: this.config.id,
-            provider: 'xai',
+            provider: 'openrouter',
             model: this.config.model,
             promptTokens: usage.prompt_tokens || 0,
             completionTokens: usage.completion_tokens || 0,
@@ -162,14 +159,14 @@ export abstract class BaseOSINTAgent<TResult = any> {
 
     } catch (error) {
       const executionTime = Date.now() - startTime
-      console.error(`[${this.config.id}] ❌ XAI call failed (${executionTime}ms):`, error)
+      console.error(`[${this.config.id}] ❌ OpenRouter call failed (${executionTime}ms):`, error)
 
       // Track failed request
       try {
         await trackTokenUsage({
           section: 'osint_profiling',
           operation: this.config.id,
-          provider: 'xai',
+          provider: 'openrouter',
           model: this.config.model,
           promptTokens: 0,
           completionTokens: 0,
@@ -185,7 +182,7 @@ export abstract class BaseOSINTAgent<TResult = any> {
 
       if (axios.isAxiosError(error)) {
         throw new Error(
-          `XAI API Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`
+          `OpenRouter API Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`
         )
       }
 
@@ -211,44 +208,48 @@ export abstract class BaseOSINTAgent<TResult = any> {
   }
 
   /**
-   * Ricerca web con Google Custom Search
+   * Ricerca web con Apify RAG Web Browser
    */
-  protected async searchWeb(query: string, numResults: number = 10): Promise<any[]> {
-    const apiKey = process.env.GOOGLE_SEARCH_API_KEY
-    const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID
-
-    if (!apiKey || !searchEngineId) {
-      console.warn(`[${this.config.id}] ⚠️  Google Search API not configured`)
+  protected async searchWeb(query: string, numResults: number = 5): Promise<WebSearchResult[]> {
+    const apiToken = process.env.APIFY_API_TOKEN
+    if (!apiToken) {
+      this.log('⚠️ APIFY_API_TOKEN not configured, skipping web search', 'warn')
       return []
     }
 
     try {
-      console.log(`[${this.config.id}] 🔍 Web search: "${query}"`)
+      console.log(`[${this.config.id}] 🔍 Web search via Apify: "${query}"`)
 
-      const response = await axios.get(
-        'https://www.googleapis.com/customsearch/v1',
+      const response = await fetch(
+        'https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=' + apiToken,
         {
-          params: {
-            key: apiKey,
-            cx: searchEngineId,
-            q: query,
-            num: Math.min(numResults, 10),
-          },
-          timeout: 10000,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            maxResults: numResults,
+            outputFormats: ['markdown'],
+          }),
+          signal: AbortSignal.timeout(30000),
         }
       )
 
-      const results = response.data.items || []
-      console.log(`[${this.config.id}] ✅ Found ${results.length} search results`)
+      if (!response.ok) {
+        this.log(`⚠️ Apify web search failed: ${response.statusText}`, 'warn')
+        return []
+      }
 
-      return results.map((item: any) => ({
-        title: item.title,
-        url: item.link,
-        snippet: item.snippet,
+      const items = await response.json() as Array<{url?: string; title?: string; markdown?: string; text?: string}>
+      console.log(`[${this.config.id}] ✅ Found ${items.length} search results via Apify`)
+
+      return items.map(item => ({
+        url: item.url || '',
+        title: item.title || '',
+        snippet: (item.markdown || item.text || '').slice(0, 500),
+        source: 'apify_rag',
       }))
-
     } catch (error) {
-      console.error(`[${this.config.id}] ❌ Web search failed:`, error)
+      this.log(`⚠️ Web search error: ${error instanceof Error ? error.message : error}`, 'warn')
       return []
     }
   }

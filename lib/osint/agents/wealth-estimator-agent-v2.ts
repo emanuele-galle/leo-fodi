@@ -21,7 +21,7 @@ export class WealthEstimatorAgentV2 extends BaseOSINTAgent<WealthProfile> {
       id: 'wealth_estimator_v2',
       name: 'Wealth Estimator V2',
       role: 'Stima capacità economica con Reflect Loop',
-      model: 'grok-4-fast-reasoning',
+      model: 'anthropic/claude-sonnet-4',
       temperature: 0.1,
       max_tokens: 2500,
       priority: 3,
