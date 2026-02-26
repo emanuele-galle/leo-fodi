@@ -5,10 +5,30 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { getServerSession } from '@/lib/auth/server'
 import { extractLeadsWorker } from '@/lib/leads/extraction-worker'
 import type { LeadSearchParams } from '@/lib/types/lead-extraction'
+
+const leadsExtractSchema = z.object({
+  name: z.string().min(1),
+  settore: z.string().optional(),
+  fonti_selezionate: z.array(z.string()).min(1),
+  sottocategoria: z.string().optional(),
+  codice_ateco: z.array(z.string()).optional(),
+  fatturato_min: z.string().optional(),
+  fatturato_max: z.string().optional(),
+  dipendenti_min: z.string().optional(),
+  dipendenti_max: z.string().optional(),
+  anno_fondazione_min: z.string().optional(),
+  anno_fondazione_max: z.string().optional(),
+  rating_min: z.number().optional(),
+  comune: z.string().optional(),
+  provincia: z.string().optional(),
+  regione: z.string().optional(),
+  nazione: z.string().optional(),
+})
 
 /**
  * POST - Start new lead extraction
@@ -26,22 +46,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const body = await request.json()
+    const rawBody = await request.json()
 
-    // Validate required fields
-    if (!body.name) {
+    // Zod validation
+    const parsed = leadsExtractSchema.safeParse(rawBody)
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Nome ricerca è obbligatorio (es: "ristorante", "dentista", "officina meccanica")' },
+        { error: 'Input non valido', details: parsed.error.flatten() },
         { status: 400 }
       )
     }
 
-    if (!body.fonti_selezionate || body.fonti_selezionate.length === 0) {
-      return NextResponse.json(
-        { error: 'Seleziona almeno una fonte di estrazione' },
-        { status: 400 }
-      )
-    }
+    const body = parsed.data
 
     // Prepare search parameters
     const searchParams: LeadSearchParams = {

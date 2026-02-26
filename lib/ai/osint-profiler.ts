@@ -195,6 +195,7 @@ export async function saveOSINTProfile(
 
 /**
  * Get existing OSINT profile from database
+ * Remaps camelCase DB fields to snake_case OSINTProfile interface
  */
 export async function getOSINTProfile(
   clientId: string
@@ -206,7 +207,21 @@ export async function getOSINTProfile(
 
     if (!profileRow) return null
 
-    return profileRow as unknown as OSINTProfile
+    // Remap camelCase DB fields to snake_case OSINTProfile interface
+    const mapped: OSINTProfile = {
+      identita_presenza_online: (profileRow as any).identitaPresenzaOnline as any,
+      presenza_digitale: (profileRow as any).presenzaDigitale as any,
+      segnali_autorita: (profileRow as any).segnaliAutorita as any,
+      modello_lavorativo: (profileRow as any).modelloLavorativo as any,
+      visione_obiettivi: (profileRow as any).visioneObiettivi as any,
+      stile_vita: (profileRow as any).stileVita as any,
+      mappatura_bisogni: (profileRow as any).mappaturaBisogni as any,
+      leve_ingaggio: (profileRow as any).leveIngaggio as any,
+      raccomandazioni_prodotti: (profileRow as any).raccomandazioniProdotti as any,
+      piano_contatto: (profileRow as any).pianoContatto as any,
+    }
+
+    return mapped
   } catch (error) {
     console.error('[OSINT] Failed to get profile:', error)
     throw new Error('Failed to retrieve profile from database')

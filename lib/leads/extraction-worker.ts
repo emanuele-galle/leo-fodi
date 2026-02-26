@@ -6,11 +6,7 @@
 import { prisma } from '@/lib/db'
 import type { LeadSearchParams, Lead } from '@/lib/types/lead-extraction'
 import { googlePlacesExtractor } from './extractors/google-places'
-import { registroImpreseItExtractor } from './extractors/registroimprese-it'
-import { registroImpreseApiExtractor } from './extractors/registro-imprese-api'
 import { pagineGialleExtractor } from './extractors/pagine-gialle'
-import { pagineBiancheExtractor } from './extractors/pagine-bianche'
-import { googleSearchExtractor } from './extractors/google-search'
 import { yelpExtractor } from './extractors/yelp'
 import { batchEnrichLeads } from './enrichment/ai-enricher'
 import { normalizeProvincia, matchComune, getProvinceByRegione } from '@/lib/data/province-italiane'
@@ -21,20 +17,10 @@ import { normalizeProvincia, matchComune, getProvinceByRegione } from '@/lib/dat
 const EXTRACTORS = {
   // ===== PRIORITY 1 - Official API Data (Highest Reliability) =====
   google_places: googlePlacesExtractor, // Google Places API - REAL DATA
-  registro_imprese_api: registroImpreseApiExtractor, // InfoCamere API - OFFICIAL DATA
 
   // ===== PRIORITY 2 - Static Scraping (Cheerio - High Performance) =====
   pagine_gialle: pagineGialleExtractor, // Pagine Gialle - Local businesses (50 leads/search)
   yelp: yelpExtractor, // Yelp - Services/Restaurants (50 leads/search)
-
-  // ===== PRIORITY 3 - Legacy/Disabled Scraping =====
-  pagine_bianche: pagineBiancheExtractor, // Pagine Bianche - White pages (disabled)
-  registroimprese_it: registroImpreseItExtractor, // Static scraping (disabled)
-  google: googleSearchExtractor, // Google search (disabled)
-
-  // Legacy aliases for backward compatibility
-  registro_imprese: registroImpreseItExtractor,
-  cciaa: registroImpreseApiExtractor, // Point to API version
 }
 
 /**
@@ -369,10 +355,12 @@ function filterByProvincia(leads: Lead[], provincia: string): Lead[] {
 
 /**
  * Filter and prioritize leads by contact availability
+ * A lead is valid if it has AT LEAST ONE of: phone, email, website
  */
 function filterAndPrioritizeContacts(leads: Lead[]): Lead[] {
   const leadsWithMobile: Lead[] = []
   const leadsWithFixedOnly: Lead[] = []
+  const leadsWithEmailOrWebOnly: Lead[] = []
 
   for (const lead of leads) {
     const phones = [lead.telefono_principale, lead.telefono_mobile, lead.telefono_centralino].filter(Boolean)
@@ -393,14 +381,18 @@ function filterAndPrioritizeContacts(leads: Lead[]): Lead[] {
         telefono_principale: fixedPhone,
         telefono_centralino: fixedPhone,
       })
+    } else if (lead.email_principale || lead.sito_web) {
+      // Lead valido se ha almeno email o sito web, anche senza telefono
+      leadsWithEmailOrWebOnly.push(lead)
     }
+    // Se non ha nessun contatto → scartato
   }
 
   console.log(
-    `[Contact Filter] Mobile leads: ${leadsWithMobile.length}, Fixed-only leads: ${leadsWithFixedOnly.length}`
+    `[Contact Filter] Mobile leads: ${leadsWithMobile.length}, Fixed-only: ${leadsWithFixedOnly.length}, Email/Web only: ${leadsWithEmailOrWebOnly.length}`
   )
 
-  return [...leadsWithMobile, ...leadsWithFixedOnly]
+  return [...leadsWithMobile, ...leadsWithFixedOnly, ...leadsWithEmailOrWebOnly]
 }
 
 /**

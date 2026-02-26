@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,7 @@ interface MonitoringStats {
 }
 
 export default function MonitoringPage() {
+  const router = useRouter()
   const [stats, setStats] = useState<MonitoringStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -63,6 +65,10 @@ export default function MonitoringPage() {
   const fetchStats = async () => {
     try {
       const response = await fetch('/api/monitoring/stats')
+      if (response.status === 401 || response.status === 403) {
+        router.replace('/dashboard')
+        return
+      }
       const data = await response.json()
       setStats(data)
     } catch (error) {

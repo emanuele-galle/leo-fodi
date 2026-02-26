@@ -4,6 +4,7 @@
  */
 
 import { BaseOSINTAgent } from '../base-agent'
+import { ReflectLoop, CONTENT_RUBRIC } from '@/lib/reflection'
 import {
   WorkModelProfileSchema,
   VisionGoalsProfileSchema,
@@ -618,6 +619,8 @@ export interface EngagementProfile {
 }
 
 export class EngagementStrategistAgentV2 extends BaseOSINTAgent<EngagementProfile> {
+  private reflectLoop = new ReflectLoop()
+
   constructor() {
     const config: AgentConfig = {
       id: 'engagement_strategist_v2',
@@ -648,12 +651,17 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Strategizing engagement...')
+      this.log('Strategizing engagement with Reflect Loop (max 1 iteration)...')
 
       const previousResults = context.previous_results
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
 
-      const engagementProfile = await this.generateEngagementProfile(previousResults, context.target, adaptiveSearch)
+      const { output: engagementProfile } = await this.reflectLoop.run<EngagementProfile>(
+        (feedback) => this.generateEngagementProfile(previousResults, context.target, adaptiveSearch, feedback),
+        CONTENT_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 
@@ -677,7 +685,8 @@ Rispondi in JSON valido.`,
       max_search_results?: number
       sources?: Array<'web' | 'news' | 'x'>
       citations?: boolean
-    }
+    },
+    feedback?: string[]
   ): Promise<EngagementProfile> {
     const needsData = previousResults?.needs_mapping || {}
     const contentData = previousResults?.content_analysis || {}
@@ -774,6 +783,10 @@ Rispondi in JSON:
   "fonti_consultate": ["Needs mapping", "Content analysis", "Lifestyle profile"]
 }
 `
+
+    if (feedback && feedback.length > 0) {
+      prompt += `\n=== FEEDBACK ITERAZIONE PRECEDENTE ===\n${feedback.map((f, i) => `${i + 1}. ${f}`).join('\n')}\nMigliorare la strategia tenendo conto del feedback sopra.\n`
+    }
 
     const aiResponse = await this.callXAI(prompt, {
       response_format: { type: 'json_object' },

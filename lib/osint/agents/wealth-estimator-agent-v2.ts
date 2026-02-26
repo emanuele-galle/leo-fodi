@@ -58,7 +58,7 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Estimating wealth (Reflect Loop DISABLED for speed)...')
+      this.log('Estimating wealth with Reflect Loop (max 1 iteration)...')
 
       // Estrai dati da raw_data (Fase 0 scraping) e agenti precedenti
       const rawData = context.shared_memory?.raw_data
@@ -67,13 +67,12 @@ Rispondi in JSON valido.`,
       const familyData = context.previous_results?.family
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const wealthProfile = await this.generateWealthProfile(
-        rawData,
-        careerData,
-        lifestyleData,
-        familyData,
-        adaptiveSearch
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+
+      const { output: wealthProfile } = await this.reflectLoop.run<WealthProfile>(
+        (feedback) => this.generateWealthProfile(rawData, careerData, lifestyleData, familyData, adaptiveSearch, feedback),
+        WEALTH_RUBRIC,
+        { maxIterations: 1, targetName }
       )
 
       const executionTime = Date.now() - startTime

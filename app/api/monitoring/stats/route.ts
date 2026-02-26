@@ -13,6 +13,9 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
   }
+  if (user.role !== 'admin') {
+    return NextResponse.json({ error: 'Accesso non autorizzato' }, { status: 403 })
+  }
 
   try {
     const { searchParams } = new URL(request.url)
@@ -96,6 +99,9 @@ export async function POST(request: Request) {
   const user = await getServerUser()
   if (!user) {
     return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  }
+  if (user.role !== 'admin') {
+    return NextResponse.json({ error: 'Accesso non autorizzato' }, { status: 403 })
   }
 
   try {

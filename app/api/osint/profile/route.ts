@@ -4,12 +4,30 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { OSINTOrchestrator } from '@/lib/osint/orchestrator'
 import { JobQueue } from '@/lib/osint/job-queue'
 import { rateLimiter, RATE_LIMITS, getClientIdentifier } from '@/lib/osint/rate-limiter'
 import { prisma } from '@/lib/db'
 import { getServerSession } from '@/lib/auth/server'
+import { getBoss, QUEUES } from '@/lib/queue/boss'
 import type { ProfilingTarget } from '@/lib/osint/types'
+
+const osintProfileSchema = z.object({
+  nome: z.string().min(2),
+  cognome: z.string().min(2),
+  email: z.string().email().optional(),
+  data_nascita: z.string().optional(),
+  citta: z.string().optional(),
+  linkedin_url: z.string().url().optional().or(z.literal('')),
+  facebook_url: z.string().url().optional().or(z.literal('')),
+  instagram_url: z.string().url().optional().or(z.literal('')),
+  consenso_profilazione: z.boolean(),
+  data_consenso: z.string().min(1),
+  note: z.string().optional(),
+  id: z.string().optional(),
+  sync: z.boolean().optional(),
+})
 
 /**
  * POST /api/osint/profile
@@ -51,25 +69,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const body = await request.json()
+    const rawBody = await request.json()
+
+    // Zod validation
+    const parsed = osintProfileSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Input non valido', details: parsed.error.flatten() },
+        { status: 400 }
+      )
+    }
+
+    const body = parsed.data
 
     // Check if this is a synchronous request (legacy support)
     const isSync = body.sync === true
-
-    // Validazione input
-    if (!body.nome || !body.cognome) {
-      return NextResponse.json(
-        { error: 'Nome e cognome sono obbligatori' },
-        { status: 400 }
-      )
-    }
-
-    if (!body.consenso_profilazione || !body.data_consenso) {
-      return NextResponse.json(
-        { error: 'Consenso profilazione e data consenso sono obbligatori' },
-        { status: 400 }
-      )
-    }
 
     // Costruisci target
     const target: ProfilingTarget = {
@@ -109,19 +123,23 @@ export async function POST(request: NextRequest) {
     // Create job in database
     const jobId = await JobQueue.createJob(target)
 
-    // Start background processing (non-blocking)
-    processJobInBackground(jobId, target, userId).catch(async (error) => {
-      console.error(`[WORKER] Job ${jobId} failed:`, error)
-
-      // Update job status to failed in database
-      try {
-        await JobQueue.failJob(jobId, error instanceof Error ? error.message : 'Unknown error')
-      } catch (updateError) {
-        console.error(`[WORKER] Failed to update job ${jobId} status:`, updateError)
-      }
-
-      // TODO: Send notification to user about failed job
-    })
+    // Enqueue job via pg-boss for durable background processing
+    try {
+      const boss = await getBoss()
+      await boss.send(QUEUES.OSINT_JOB, { jobId, targetData: target, userId: userId || null })
+      console.log(`[API] Job enqueued to pg-boss queue: ${QUEUES.OSINT_JOB}`)
+    } catch (queueError) {
+      console.warn(`[API] pg-boss unavailable, falling back to in-process background:`, queueError)
+      // Fallback: run in-process if pg-boss fails (e.g. DB schema not migrated yet)
+      processJobInBackground(jobId, target, userId).catch(async (error) => {
+        console.error(`[WORKER] Job ${jobId} failed:`, error)
+        try {
+          await JobQueue.failJob(jobId, error instanceof Error ? error.message : 'Unknown error')
+        } catch (updateError) {
+          console.error(`[WORKER] Failed to update job ${jobId} status:`, updateError)
+        }
+      })
+    }
 
     console.log(`[API] ✅ Job created with ID: ${jobId}`)
 

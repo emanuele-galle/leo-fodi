@@ -4,6 +4,7 @@
  */
 
 import { BaseOSINTAgent } from '../base-agent'
+import { ReflectLoop, SOCIAL_RUBRIC } from '@/lib/reflection'
 import type {
   AuthoritySignalsProfile,
   AgentConfig,
@@ -13,6 +14,8 @@ import type {
 import { AuthoritySignalsProfileSchema } from '../schemas/all-profiles.schema'
 
 export class AuthoritySignalsAnalyzerAgentV2 extends BaseOSINTAgent<AuthoritySignalsProfile> {
+  private reflectLoop = new ReflectLoop()
+
   constructor() {
     const config: AgentConfig = {
       id: 'authority_signals_v2',
@@ -47,12 +50,17 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Analyzing authority signals...')
+      this.log('Analyzing authority signals with Reflect Loop (max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
 
-      const authorityProfile = await this.generateAuthorityProfile(rawData, context.target, adaptiveSearch)
+      const { output: authorityProfile } = await this.reflectLoop.run<AuthoritySignalsProfile>(
+        (feedback) => this.generateAuthorityProfile(rawData, context.target, adaptiveSearch, feedback),
+        SOCIAL_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 
@@ -76,7 +84,8 @@ Rispondi in JSON valido.`,
       max_search_results?: number
       sources?: Array<'web' | 'news' | 'x'>
       citations?: boolean
-    }
+    },
+    feedback?: string[]
   ): Promise<AuthoritySignalsProfile> {
     const targetName = `${target.nome} ${target.cognome}`
     let prompt = `Analizza i segnali di autorità e influenza di ${targetName}.
@@ -235,6 +244,10 @@ Rispondi in JSON:
   "fonti_consultate": ["LinkedIn", "Instagram", "Facebook", "Google Search"]
 }
 `
+
+    if (feedback && feedback.length > 0) {
+      prompt += `\n=== FEEDBACK ITERAZIONE PRECEDENTE ===\n${feedback.map((f, i) => `${i + 1}. ${f}`).join('\n')}\nMigliorare l'analisi tenendo conto del feedback sopra.\n`
+    }
 
     const aiResponse = await this.callXAI(prompt, {
       response_format: { type: 'json_object' },
