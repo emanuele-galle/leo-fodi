@@ -3,6 +3,8 @@
  * Compatible with OpenAI chat/completions format
  */
 
+import { getCachedAI, setCachedAI } from '@/lib/cache/ai-cache'
+
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1'
 const DEFAULT_MODEL = process.env.AI_MODEL || 'anthropic/claude-sonnet-4'
 
@@ -72,6 +74,27 @@ export async function callAI(
 
   const model = options.model || DEFAULT_MODEL
 
+  // Cache lookup (skip for non-deterministic calls with temperature > 0.1)
+  const cacheKey = JSON.stringify(messages)
+  if ((options.temperature ?? 0.7) <= 0.1) {
+    try {
+      const cached = await getCachedAI(cacheKey, model)
+      if (cached) {
+        console.log(`[AI] Cache hit for model: ${model}`)
+        return {
+          id: 'cached',
+          object: 'chat.completion',
+          created: Date.now(),
+          model,
+          choices: [{ index: 0, message: { role: 'assistant', content: cached }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        }
+      }
+    } catch {
+      // Cache lookup failed - proceed with API call
+    }
+  }
+
   const requestBody: Record<string, unknown> = {
     model,
     messages,
@@ -122,6 +145,17 @@ export async function callAI(
 
       const data: AIResponse = await response.json()
       console.log(`[AI] Success - Tokens used: ${data.usage?.total_tokens || 'N/A'}`)
+
+      // Store successful response in cache (only for low-temperature / deterministic calls)
+      if ((options.temperature ?? 0.7) <= 0.1) {
+        const responseContent = data.choices?.[0]?.message?.content
+        if (responseContent) {
+          setCachedAI(cacheKey, model, responseContent).catch(() => {
+            // Non-critical: cache store failure should not break the response
+          })
+        }
+      }
+
       return data
     } catch (error) {
       lastError = error as Error

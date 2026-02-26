@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
     const clientData = validationResult.data
 
     // Run OSINT workflow with authenticated user's ID
+    // DEPRECATED: This endpoint uses the legacy OSINT profiler. Use /api/osint/profile instead.
+    console.warn('[API] /api/profiling is deprecated. Use /api/osint/profile for the new multi-agent OSINT system.')
     console.log(`[API] Creating profile for user: ${userId}`)
     const result = await runOSINTWorkflow(clientData, userId)
 
@@ -57,7 +59,14 @@ export async function POST(request: NextRequest) {
       profile: result.profile,
     }
 
-    return NextResponse.json(response, { status: 200 })
+    return NextResponse.json(response, {
+      status: 200,
+      headers: {
+        'Deprecation': 'true',
+        'Link': '</api/osint/profile>; rel="successor-version"',
+        'X-Deprecated-By': '/api/osint/profile',
+      },
+    })
 
   } catch (error) {
     console.error('[API] Profiling POST error:', error)

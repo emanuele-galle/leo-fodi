@@ -40,6 +40,10 @@ export async function POST(request: NextRequest) {
 
     const { clientId } = validationResult.data
 
+    // NOTE: This endpoint uses the legacy financial planner which reads from the legacy OSINT profile.
+    // Future: migrate to use prisma.osintProfile (new system) when financial-planner is updated.
+    console.warn('[API] /api/planning: using legacy financial workflow. Ensure OSINT profile exists via /api/osint/profile for best results.')
+
     // Run financial planning workflow
     const result = await runFinancialWorkflow(clientId)
 

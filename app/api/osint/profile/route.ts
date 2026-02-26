@@ -212,32 +212,24 @@ async function saveProfileToDatabase(profile: any, userId?: string) {
     console.log(`   - rawData: ${profile.rawData ? 'exists' : 'missing'}`)
     console.log(`   - sintesi_esecutiva length: ${profile.sintesi_esecutiva?.length || 0}`)
 
-    await prisma.osintProfile.upsert({
-      where: { targetId: profile.target.id },
-      update: {
-        nome: profile.target.nome,
-        cognome: profile.target.cognome,
-        profileData: profile,
-        punteggioComplessivo: profile.punteggio_complessivo,
-        completezzaProfilo: profile.completezza_profilo,
-        agentUtilizzati: profile.agent_utilizzati || [],
-        consensoProfilazione: profile.target.consenso_profilazione,
-        dataConsenso: profile.target.data_consenso ? new Date(profile.target.data_consenso) : null,
-        userId: userId || null,
-      },
-      create: {
-        targetId: profile.target.id,
-        nome: profile.target.nome,
-        cognome: profile.target.cognome,
-        profileData: profile,
-        punteggioComplessivo: profile.punteggio_complessivo,
-        completezzaProfilo: profile.completezza_profilo,
-        agentUtilizzati: profile.agent_utilizzati || [],
-        consensoProfilazione: profile.target.consenso_profilazione,
-        dataConsenso: profile.target.data_consenso ? new Date(profile.target.data_consenso) : null,
-        userId: userId || null,
-      },
-    })
+    const profilePayload = {
+      nome: profile.target.nome,
+      cognome: profile.target.cognome,
+      profileData: profile,
+      punteggioComplessivo: profile.punteggio_complessivo,
+      completezzaProfilo: profile.completezza_profilo,
+      agentUtilizzati: profile.agent_utilizzati || [],
+      consensoProfilazione: profile.target.consenso_profilazione,
+      dataConsenso: profile.target.data_consenso ? new Date(profile.target.data_consenso) : null,
+      userId: userId || null,
+    }
+
+    const existing = await prisma.osintProfile.findFirst({ where: { targetId: profile.target.id } })
+    if (existing) {
+      await prisma.osintProfile.update({ where: { id: existing.id }, data: profilePayload })
+    } else {
+      await prisma.osintProfile.create({ data: { ...profilePayload, targetId: profile.target.id } })
+    }
 
     console.log(`[DB] ✅ Profile saved for ${profile.target.nome} ${profile.target.cognome}`)
   } catch (error) {

@@ -8,6 +8,7 @@ import type { LeadSearchParams, Lead } from '@/lib/types/lead-extraction'
 import { googlePlacesExtractor } from './extractors/google-places'
 import { pagineGialleExtractor } from './extractors/pagine-gialle'
 import { yelpExtractor } from './extractors/yelp'
+import { apifyGoogleMapsExtractor } from './extractors/apify-google-maps'
 import { batchEnrichLeads } from './enrichment/ai-enricher'
 import { normalizeProvincia, matchComune, getProvinceByRegione } from '@/lib/data/province-italiane'
 // LinkedIn and Facebook are ONLY used in web enrichment, not in lead extraction
@@ -18,7 +19,10 @@ const EXTRACTORS = {
   // ===== PRIORITY 1 - Official API Data (Highest Reliability) =====
   google_places: googlePlacesExtractor, // Google Places API - REAL DATA
 
-  // ===== PRIORITY 2 - Static Scraping (Cheerio - High Performance) =====
+  // ===== PRIORITY 2 - Apify Actors (High Volume, Async) =====
+  apify_google_maps: apifyGoogleMapsExtractor, // Google Maps via Apify (up to 200 leads/search)
+
+  // ===== PRIORITY 3 - Static Scraping (Cheerio - High Performance) =====
   pagine_gialle: pagineGialleExtractor, // Pagine Gialle - Local businesses (50 leads/search)
   yelp: yelpExtractor, // Yelp - Services/Restaurants (50 leads/search)
 }
