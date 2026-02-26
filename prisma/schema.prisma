@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// AUTH (Better Auth)
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  role          String    @default("user")
+  approved      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  // App relations
+  clients          Client[]
+  profiles         Profile[]
+  financialPlans   FinancialPlan[]
+  osintProfiles    OsintProfile[]
+  leadSearches     LeadSearch[]
+  leadContactStatuses LeadContactStatus[]
+  aiTokenUsages    AiTokenUsage[]
+  apiUsageLogs     ApiUsageLog[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ============================================
+// CLIENTS & PROFILING
+// ============================================
+
+model Client {
+  id          String   @id @default(cuid())
+  userId      String?
+  nome        String
+  cognome     String
+  email       String?
+  phone       String?
+  localita    String?
+  ruolo       String?
+  settore     String?
+  sitoWeb     String?  @map("sito_web")
+  websiteUrl  String?  @map("website_url")
+  linkSocial  String[] @map("link_social")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user     User?    @relation(fields: [userId], references: [id])
+  profile  Profile?
+  aiTokenUsages AiTokenUsage[]
+
+  @@map("clients")
+}
+
+model Profile {
+  id                     String   @id @default(cuid())
+  clientId               String   @unique @map("client_id")
+  userId                 String?  @map("user_id")
+  identitaPresenzaOnline Json     @map("identita_presenza_online")
+  presenzaDigitale       Json     @map("presenza_digitale")
+  segnaliAutorita        Json     @map("segnali_autorita")
+  modelloLavorativo      Json     @map("modello_lavorativo")
+  visioneObiettivi       Json     @map("visione_obiettivi")
+  stileVita              Json     @map("stile_vita")
+  mappaturaBisogni       Json     @map("mappatura_bisogni")
+  leveIngaggio           Json     @map("leve_ingaggio")
+  raccomandazioniProdotti Json    @map("raccomandazioni_prodotti")
+  pianoContatto          Json     @map("piano_contatto")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user          User?          @relation(fields: [userId], references: [id])
+  financialPlan FinancialPlan?
+  aiTokenUsages AiTokenUsage[]
+
+  @@map("profiles")
+}
+
+model FinancialPlan {
+  id                      String   @id @default(cuid())
+  profileId               String   @unique @map("profile_id")
+  userId                  String?  @map("user_id")
+  obiettiviFinanziari     Json     @map("obiettivi_finanziari")
+  analisiGap              Json     @map("analisi_gap")
+  sequenzaRaccomandata    Json     @map("sequenza_raccomandata")
+  spuntiFiscali           Json     @map("spunti_fiscali")
+  raccomandazioniProdotti Json     @map("raccomandazioni_prodotti")
+  sintesiValore           Json     @map("sintesi_valore")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@map("financial_plans")
+}
+
+// ============================================
+// OSINT
+// ============================================
+
+model OsintJob {
+  id           String    @id @default(cuid())
+  jobId        String    @unique @map("job_id")
+  status       String    @default("pending")
+  targetData   Json      @map("target_data")
+  currentPhase String?   @map("current_phase")
+  progress     Int?      @default(0)
+  result       Json?
+  error        String?
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("osint_jobs")
+}
+
+model OsintProfile {
+  id                  String   @id @default(cuid())
+  userId              String?  @map("user_id")
+  targetId            String   @map("target_id")
+  nome                String
+  cognome             String
+  profileData         Json     @map("profile_data")
+  punteggioComplessivo Int?    @map("punteggio_complessivo")
+  completezzaProfilo  Int?     @map("completezza_profilo")
+  agentUtilizzati     String[] @map("agent_utilizzati")
+  consensoProfilazione Boolean @default(false) @map("consenso_profilazione")
+  dataConsenso        DateTime? @map("data_consenso")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("osint_profiles")
+}
+
+// ============================================
+// LEADS
+// ============================================
+
+model LeadSearch {
+  id              String    @id @default(cuid())
+  userId          String?   @map("user_id")
+  name            String
+  settore         String
+  sottocategoria  String?
+  regione         String?
+  provincia       String?
+  comune          String?
+  nazione         String?
+  codiceAteco     String[]  @map("codice_ateco")
+  fatturatoMin    Float?    @map("fatturato_min")
+  fatturatoMax    Float?    @map("fatturato_max")
+  dipendentiMin   Int?      @map("dipendenti_min")
+  dipendentiMax   Int?      @map("dipendenti_max")
+  annoFondazioneMin Int?    @map("anno_fondazione_min")
+  annoFondazioneMax Int?    @map("anno_fondazione_max")
+  ratingMin       String?   @map("rating_min")
+  fontiAbilitate  Json?     @map("fonti_abilitate")
+  prioritaFonti   String[]  @map("priorita_fonti")
+  config          Json?
+  status          String?   @default("pending")
+  leadsTrovati    Int?      @default(0) @map("leads_trovati")
+  leadsValidati   Int?      @default(0) @map("leads_validati")
+  fontiConsultate Int?      @default(0) @map("fonti_consultate")
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user          User?          @relation(fields: [userId], references: [id])
+  leads         Lead[]
+  leadSources   LeadSource[]
+  aiTokenUsages AiTokenUsage[]
+
+  @@map("lead_searches")
+}
+
+model Lead {
+  id                  String    @id @default(cuid())
+  searchId            String?   @map("search_id")
+  ragioneSociale      String    @map("ragione_sociale")
+  nomeCommerciale     String?   @map("nome_commerciale")
+  partitaIva          String?   @map("partita_iva")
+  codiceFiscale       String?   @map("codice_fiscale")
+  formaGiuridica      String?   @map("forma_giuridica")
+  settore             String?
+  categoria           String?
+  codiceAteco         String?   @map("codice_ateco")
+  indirizzo           String?
+  citta               String?
+  cap                 String?
+  provincia           String?
+  regione             String?
+  nazione             String?
+  telefonoPrincipale  String?   @map("telefono_principale")
+  telefonoCentralino  String?   @map("telefono_centralino")
+  telefonoMobile      String?   @map("telefono_mobile")
+  telefonoWhatsapp    String?   @map("telefono_whatsapp")
+  emailPrincipale     String?   @map("email_principale")
+  emailPec            String?   @map("email_pec")
+  sitoWeb             String?   @map("sito_web")
+  facebookUrl         String?   @map("facebook_url")
+  instagramUrl        String?   @map("instagram_url")
+  linkedinUrl         String?   @map("linkedin_url")
+  altriSocial         Json?     @map("altri_social")
+  titolareNome        String?   @map("titolare_nome")
+  titolareCognome     String?   @map("titolare_cognome")
+  legaleRappresentante String?  @map("legale_rappresentante")
+  referenti           Json?
+  fatturato           Float?
+  dipendenti          Int?
+  annoFondazione      Int?      @map("anno_fondazione")
+  ratingCreditizio    String?   @map("rating_creditizio")
+  descrizione         String?
+  note                String?
+  fontePrimaria       String?   @map("fonte_primaria")
+  fontiConsultate     String[]  @map("fonti_consultate")
+  affidabilitaScore   Float?    @map("affidabilita_score")
+  validazioneStatus   String?   @map("validazione_status")
+  dataEstrazione      DateTime? @map("data_estrazione")
+  dataValidazione     DateTime? @map("data_validazione")
+  ultimaVerifica      DateTime? @map("ultima_verifica")
+  attivo              Boolean?  @default(true)
+  daContattare        Boolean?  @default(true) @map("da_contattare")
+  priorita            String?
+  extraData           Json?     @map("extra_data")
+  rawDataSc           Json?     @map("raw_data_sc")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  search         LeadSearch?      @relation(fields: [searchId], references: [id])
+  contactStatus  LeadContactStatus?
+  contacts       LeadContact[]
+  sources        LeadSource[]
+  validations    LeadValidation[]
+
+  @@map("leads")
+}
+
+model LeadContact {
+  id                String    @id @default(cuid())
+  leadId            String?   @map("lead_id")
+  tipoContatto      String    @map("tipo_contatto")
+  valore            String
+  fonte             String
+  fonteUrl          String?   @map("fonte_url")
+  label             String?
+  ufficiale         Boolean?  @default(false)
+  validato          Boolean?  @default(false)
+  validazioneMetodo String?   @map("validazione_metodo")
+  validazioneData   DateTime? @map("validazione_data")
+  validazioneNote   String?   @map("validazione_note")
+  affidabilita      Float?
+  attivo            Boolean?  @default(true)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_contacts")
+}
+
+model LeadSource {
+  id              String   @id @default(cuid())
+  leadId          String?  @map("lead_id")
+  searchId        String?  @map("search_id")
+  fonteNome       String   @map("fonte_nome")
+  fonteTipo       String   @map("fonte_tipo")
+  fonteUrl        String?  @map("fonte_url")
+  risultato       String
+  datiEstratti    Json?    @map("dati_estratti")
+  tempoEsecuzioneMs Int?  @map("tempo_esecuzione_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  lead   Lead?       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  search LeadSearch? @relation(fields: [searchId], references: [id])
+
+  @@map("lead_sources")
+}
+
+model LeadValidation {
+  id               String   @id @default(cuid())
+  leadId           String?  @map("lead_id")
+  tipoValidazione  String   @map("tipo_validazione")
+  campoValidato    String   @map("campo_validato")
+  valorePrecedente String?  @map("valore_precedente")
+  valoreNuovo      String?  @map("valore_nuovo")
+  esito            String
+  metodo           String?
+  validatoDa       String?  @map("validato_da")
+  note             String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_validations")
+}
+
+model LeadContactStatus {
+  id            String   @id @default(cuid())
+  leadId        String   @unique @map("lead_id")
+  userId        String   @map("user_id")
+  contactStatus String   @map("contact_status")
+  contactedAt   DateTime @default(now()) @map("contacted_at")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("lead_contact_status")
+}
+
+// ============================================
+// MONITORING & USAGE
+// ============================================
+
+model AiTokenUsage {
+  id                  String   @id @default(cuid())
+  userId              String?  @map("user_id")
+  clientId            String?  @map("client_id")
+  profileId           String?  @map("profile_id")
+  searchId            String?  @map("search_id")
+  provider            String   @default("openrouter")
+  model               String
+  section             String
+  operation           String
+  promptTokens        Int      @default(0) @map("prompt_tokens")
+  completionTokens    Int      @default(0) @map("completion_tokens")
+  totalTokens         Int      @default(0) @map("total_tokens")
+  costPer1kPrompt     Float?   @map("cost_per_1k_prompt")
+  costPer1kCompletion Float?   @map("cost_per_1k_completion")
+  totalCost           Float?   @map("total_cost")
+  executionTimeMs     Int?     @map("execution_time_ms")
+  status              String   @default("success")
+  errorMessage        String?  @map("error_message")
+  requestParams       Json?    @map("request_params")
+  responseSummary     Json?    @map("response_summary")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  user    User?       @relation(fields: [userId], references: [id])
+  client  Client?     @relation(fields: [clientId], references: [id])
+  profile Profile?    @relation(fields: [profileId], references: [id])
+  search  LeadSearch? @relation(fields: [searchId], references: [id])
+
+  @@map("ai_token_usage")
+}
+
+model ApiUsageLog {
+  id           String   @id @default(cuid())
+  userId       String?  @map("user_id")
+  provider     String
+  apiName      String   @default("unknown") @map("api_name")
+  endpoint     String
+  success      Boolean  @default(true)
+  cost         Float    @default(0)
+  tokensUsed   Int?     @map("tokens_used")
+  errorMessage String?  @map("error_message")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("api_usage_logs")
+}

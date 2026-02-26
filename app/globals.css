@@ -1,0 +1,456 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* Base colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Fonts */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Leonardo Brand Colors - RGB format for Tailwind */
+  --color-leonardo-green-900: var(--leonardo-green-900);
+  --color-leonardo-green-700: var(--leonardo-green-700);
+  --color-leonardo-green-500: var(--leonardo-green-500);
+  --color-leonardo-gray-900: var(--leonardo-gray-900);
+  --color-leonardo-gray-700: var(--leonardo-gray-700);
+  --color-leonardo-gray-500: var(--leonardo-gray-500);
+  --color-leonardo-gray-300: var(--leonardo-gray-300);
+  --color-leonardo-gray-100: var(--leonardo-gray-100);
+
+  /* Extended Leonardo Palette - RGB format for Tailwind */
+  --color-leonardo-pink: var(--leonardo-pink);
+  --color-leonardo-blue-light: var(--leonardo-blue-light);
+  --color-leonardo-gray-dark: var(--leonardo-gray-dark);
+  --color-leonardo-green-lime: var(--leonardo-green-lime);
+  --color-leonardo-orange: var(--leonardo-orange);
+  --color-leonardo-red-bright: var(--leonardo-red-bright);
+
+  /* Semantic colors */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  /* Sidebar */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  /* Charts */
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  /* UI Elements */
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Radius - Leonardo uses smaller radius */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* 🎯 SHADOWS & DEPTH - Professional Double Shadow System */
+
+  /* Card Shadows (Main UI Elements) */
+  --shadow-card-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-card-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-card-xl: 0 20px 25px rgba(0, 0, 0, 0.15), 0 8px 10px rgba(0, 0, 0, 0.05);
+
+  /* Button Shadows (Brand Color) */
+  --shadow-button: 0 2px 4px rgba(17, 90, 35, 0.2), 0 1px 2px rgba(17, 90, 35, 0.1);
+  --shadow-button-hover: 0 4px 8px rgba(17, 90, 35, 0.25), 0 2px 4px rgba(17, 90, 35, 0.15);
+  --shadow-button-active: 0 1px 2px rgba(17, 90, 35, 0.3), 0 0px 1px rgba(17, 90, 35, 0.2);
+
+  /* Input Shadows */
+  --shadow-input: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-input-focus: 0 0 0 3px rgba(17, 90, 35, 0.1), 0 1px 2px rgba(0, 0, 0, 0.05);
+
+  /* Elevated Elements (Dropdown, Modal) */
+  --shadow-elevated-sm: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-elevated-md: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  --shadow-elevated-lg: 0 16px 48px rgba(0, 0, 0, 0.16), 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* 🎨 LEONARDO ASSICURAZIONI - BRAND COLOR SYSTEM */
+
+  /* Brand Colors (Primary) - Verde Leonardo #115A23 */
+  --leonardo-green-900: 17 90 35;        /* #115A23 - Brand principale */
+  --leonardo-green-700: 26 122 50;       /* #1a7a32 - Verde intermedio */
+  --leonardo-green-500: 35 130 56;       /* #238238 - Verde accent */
+
+  /* Primary - Verde Brand */
+  --primary: oklch(0.35 0.12 145);              /* #115A23 convertito */
+  --primary-foreground: oklch(0.99 0 0);        /* Bianco */
+
+  /* Semantic Colors - Leonardo */
+  --success: oklch(0.74 0.17 165);      /* #00d084 - vivid-green-cyan */
+  --warning: oklch(0.84 0.15 85);       /* #fcb900 - luminous-vivid-amber */
+  --error: oklch(0.56 0.20 25);         /* #cf2e2e - vivid-red */
+  --info: oklch(0.62 0.16 230);         /* #0693e3 - vivid-cyan-blue */
+
+  /* Extended Leonardo Palette - Additional Brand Colors */
+  --leonardo-pink: 177 80 130;          /* #B15082 - Rosa Leonardo */
+  --leonardo-blue-light: 145 189 226;   /* #91BDE2 - Azzurro chiaro */
+  --leonardo-gray-dark: 87 87 87;       /* #575757 - Grigio scuro */
+  --leonardo-green-lime: 162 192 84;    /* #A2C054 - Verde lime */
+  --leonardo-orange: 248 172 61;        /* #F8AC3D - Arancione */
+  --leonardo-red-bright: 255 46 95;     /* #FF2E5F - Rosso acceso */
+
+  /* Neutral Colors - Leonardo */
+  --leonardo-gray-900: 50 55 60;        /* #32373c - Grigio scuro */
+  --leonardo-gray-700: 89 94 99;        /* #595e63 */
+  --leonardo-gray-500: 113 117 121;     /* #717579 */
+  --leonardo-gray-300: 171 184 195;     /* #abb8c3 - Grigio chiaro */
+  --leonardo-gray-100: 245 245 245;     /* #f5f5f5 */
+
+  /* Neutrals (85% of UI) */
+  --background: oklch(0.99 0 0);                /* Bianco puro */
+  --foreground: oklch(0.25 0.01 250);           /* Grigio scuro quasi nero */
+  --card: oklch(1 0 0);                         /* Bianco card */
+  --card-foreground: oklch(0.25 0.01 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.25 0.01 250);
+
+  /* Secondary - Grigio Leonardo */
+  --secondary: oklch(0.30 0.01 240);            /* #32373c - Grigio scuro */
+  --secondary-foreground: oklch(0.99 0 0);      /* Bianco */
+
+  /* Muted - Grigio Chiaro */
+  --muted: oklch(0.96 0.005 200);               /* Background subtle */
+  --muted-foreground: oklch(0.65 0.01 240);     /* #abb8c3 area */
+
+  /* Accent - Verde Subtle */
+  --accent: oklch(0.97 0.02 145);               /* Verde molto chiaro */
+  --accent-foreground: oklch(0.35 0.12 145);    /* Verde brand */
+
+  /* Destructive - Rosso Leonardo */
+  --destructive: oklch(0.56 0.20 25);           /* #cf2e2e */
+  --destructive-foreground: oklch(0.99 0 0);
+
+  /* Borders & Inputs - Grigio Chiaro */
+  --border: oklch(0.85 0.005 220);              /* #abb8c3 area */
+  --input: oklch(0.98 0.002 200);               /* Background input */
+  --ring: oklch(0.35 0.12 145);                 /* Verde brand per focus */
+
+  /* Charts - Leonardo Semantic Colors */
+  --chart-1: oklch(0.35 0.12 145);              /* Verde brand */
+  --chart-2: oklch(0.62 0.16 230);              /* Info blue */
+  --chart-3: oklch(0.74 0.17 165);              /* Success green */
+  --chart-4: oklch(0.56 0.20 25);               /* Error red */
+  --chart-5: oklch(0.84 0.15 85);               /* Warning amber */
+
+  /* Sidebar - Verde Scuro */
+  --sidebar: oklch(0.30 0.08 145);              /* Verde molto scuro */
+  --sidebar-foreground: oklch(0.98 0 0);
+  --sidebar-primary: oklch(0.35 0.12 145);      /* Verde brand */
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.40 0.10 145);       /* Verde accent */
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.25 0.06 145);       /* Bordo scuro */
+  --sidebar-ring: oklch(0.35 0.12 145);         /* Verde brand */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: var(--ring);
+    outline-opacity: 0.5;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  /* Leonardo Assicurazioni - Shadows */
+  .shadow-natural {
+    box-shadow: 6px 6px 9px rgba(0, 0, 0, 0.2);
+  }
+
+  .shadow-deep {
+    box-shadow: 12px 12px 50px rgba(0, 0, 0, 0.4);
+  }
+
+  .shadow-sharp {
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Simple transitions */
+  .transition-colors {
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+  }
+
+  .transition-shadow {
+    transition: box-shadow 0.3s;
+  }
+
+  .transition-base {
+    transition: all 200ms ease;
+  }
+
+  .transition-fast {
+    transition: all 150ms ease;
+  }
+
+  .transition-slow {
+    transition: all 300ms ease;
+  }
+
+  /* Touch targets (WCAG 2.1 AA) */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Leonardo Brand Buttons */
+  .btn-leonardo-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.375rem;
+    border: 0;
+    transition: all 200ms ease;
+    outline: none;
+  }
+
+  .btn-leonardo-primary:hover {
+    background: rgb(var(--leonardo-green-700));
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 9px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-leonardo-primary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .btn-leonardo-secondary {
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.375rem;
+    border: 0;
+    transition: all 200ms ease;
+    outline: none;
+  }
+
+  .btn-leonardo-secondary:hover {
+    background: rgb(var(--leonardo-gray-700));
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 9px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-leonardo-secondary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .btn-leonardo-ghost {
+    background: transparent;
+    color: var(--primary);
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.375rem;
+    border: 2px solid var(--primary);
+    transition: all 200ms ease;
+    outline: none;
+  }
+
+  .btn-leonardo-ghost:hover {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-leonardo-ghost:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Leonardo Card Style */
+  .card-leonardo {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    box-shadow: 6px 6px 9px rgba(0, 0, 0, 0.2);
+    transition: box-shadow 0.3s;
+  }
+
+  .card-leonardo:hover {
+    box-shadow: 12px 12px 50px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+  }
+
+  /* Leonardo Input Style */
+  .input-leonardo {
+    background: var(--input);
+    border: 2px solid var(--border);
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+    outline: none;
+  }
+
+  .input-leonardo:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(17, 90, 35, 0.2);
+  }
+
+  .input-leonardo-error {
+    background: var(--input);
+    border: 2px solid var(--destructive);
+    border-radius: 0.375rem;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+    outline: none;
+  }
+
+  .input-leonardo-error:focus {
+    border-color: var(--destructive);
+    box-shadow: 0 0 0 2px rgba(207, 46, 46, 0.2);
+  }
+
+  /* 🎯 SHADOW UTILITY CLASSES - Professional Depth System */
+
+  /* Card Shadows */
+  .shadow-card-xs { box-shadow: var(--shadow-card-xs); }
+  .shadow-card-sm { box-shadow: var(--shadow-card-sm); }
+  .shadow-card-md { box-shadow: var(--shadow-card-md); }
+  .shadow-card-lg { box-shadow: var(--shadow-card-lg); }
+  .shadow-card-xl { box-shadow: var(--shadow-card-xl); }
+
+  /* Button Shadows */
+  .shadow-button { box-shadow: var(--shadow-button); }
+  .shadow-button-hover { box-shadow: var(--shadow-button-hover); }
+  .shadow-button-active { box-shadow: var(--shadow-button-active); }
+
+  /* Input Shadows */
+  .shadow-input { box-shadow: var(--shadow-input); }
+  .shadow-input-focus { box-shadow: var(--shadow-input-focus); }
+
+  /* Elevated Shadows */
+  .shadow-elevated-sm { box-shadow: var(--shadow-elevated-sm); }
+  .shadow-elevated-md { box-shadow: var(--shadow-elevated-md); }
+  .shadow-elevated-lg { box-shadow: var(--shadow-elevated-lg); }
+
+  /* Hover Transitions for Shadows */
+  .transition-shadow {
+    transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-lift {
+    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Card with Depth (ready-to-use class) */
+  .card-depth {
+    background: white;
+    border-radius: 1rem;
+    box-shadow: var(--shadow-card-md);
+    transition: box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .card-depth:hover {
+    box-shadow: var(--shadow-card-lg);
+  }
+
+  /* Button with Depth (ready-to-use class) */
+  .button-depth {
+    box-shadow: var(--shadow-button);
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .button-depth:hover {
+    box-shadow: var(--shadow-button-hover);
+    transform: translateY(-1px);
+  }
+
+  .button-depth:active {
+    box-shadow: var(--shadow-button-active);
+    transform: translateY(0);
+  }
+}

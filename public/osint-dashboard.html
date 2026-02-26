@@ -1,0 +1,3996 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Intelligence OSINT</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #0f172a;
+            --dark-light: #1e293b;
+            --gray: #64748b;
+            --light: #f1f5f9;
+            --white: #ffffff;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: var(--dark);
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, var(--dark) 0%, var(--dark-light) 100%);
+            color: white;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-header p {
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .nav-item.active {
+            background: rgba(37, 99, 235, 0.2);
+            color: white;
+            border-left-color: var(--primary);
+        }
+
+        .nav-item .icon {
+            font-size: 1.5rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-item .label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .nav-item .badge {
+            background: var(--primary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
+
+        .top-bar {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-bar-title h1 {
+            font-size: 1.75rem;
+            color: var(--dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .top-bar-title p {
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-outline {
+            background: white;
+            color: var(--dark);
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Content Area */
+        .content-wrapper {
+            padding: 3rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .section-view {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section-view.active {
+            display: block;
+            padding-bottom: 3rem;
+        }
+
+        /* Section Header */
+        .section-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .section-header h2 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin: 0 0 0.5rem 0;
+        }
+
+        .section-header p {
+            font-size: 1rem;
+            color: var(--gray);
+            margin: 0;
+        }
+
+        /* Chart Header */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .chart-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--dark);
+            margin: 0;
+        }
+
+        .chart-header .legend {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .chart-header .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-header .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card-label {
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+
+        .stat-card-trend {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+        }
+
+        .trend-up {
+            color: var(--success);
+        }
+
+        .trend-down {
+            color: var(--danger);
+        }
+
+        /* Chart Card */
+        .chart-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .chart-card-subtitle {
+            color: var(--gray);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2rem;
+        }
+
+        /* Data Table */
+        .data-table {
+            background: white;
+            border-radius: 16px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            max-width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        .data-table table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse;
+        }
+
+        .data-table thead {
+            background: var(--light);
+        }
+
+        .data-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-top: 1px solid #e2e8f0;
+            color: var(--gray);
+        }
+
+        .data-table tbody tr:hover {
+            background: var(--light);
+        }
+
+        /* Distintivo */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-primary {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--primary);
+        }
+
+        /* Info Cards Grid */
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .info-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .info-card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+
+        .info-card-content {
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
+        .info-card-list {
+            list-style: none;
+        }
+
+        .info-card-list li {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info-card-list li:last-child {
+            border-bottom: none;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 10px;
+            transition: width 1s ease;
+        }
+
+        /* Chart Grid Wrapper */
+        .chart-grid {
+            display: grid;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .chart-grid.two-column {
+            grid-template-columns: 1fr 2fr;
+        }
+
+        .chart-grid.three-column {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            :root {
+                --sidebar-width: 0;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            .info-cards {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Force all chart grids to single column on tablets */
+            .chart-grid.two-column,
+            .chart-grid.three-column,
+            .chart-grid[style*="grid-template-columns"] {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Legacy inline styles override - AGGRESSIVE */
+            div[style*="grid-template-columns"] {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                max-width: 100vw !important;
+                padding-right: 0 !important;
+                margin-left: 0 !important;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+
+            .top-bar {
+                padding: 1rem !important;
+            }
+
+            .content-area {
+                padding: 1rem !important;
+                max-width: 100% !important;
+            }
+
+            .section-header h2 {
+                font-size: 1.5rem !important;
+            }
+
+            .section-header p {
+                font-size: 0.875rem !important;
+            }
+
+            .data-table {
+                overflow-x: auto !important;
+                margin-left: -1rem;
+                margin-right: -1rem;
+                border-radius: 0;
+            }
+
+            .data-table table {
+                min-width: 500px;
+            }
+
+            /* Force ALL grids to single column on mobile - SUPER AGGRESSIVE */
+            .chart-grid,
+            .chart-grid.two-column,
+            .chart-grid.three-column,
+            div[style*="grid-template-columns"],
+            .info-cards {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+
+            /* Reduce chart heights on mobile */
+            .chart-container div[style*="height: 300px"],
+            .chart-container div[style*="height: 350px"],
+            .chart-container div[style*="height: 400px"] {
+                height: 250px !important;
+            }
+
+            /* Make tables more readable on mobile */
+            .data-table table {
+                font-size: 0.875rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.75rem 0.5rem;
+                white-space: nowrap;
+            }
+
+            /* Reduce padding on cards */
+            .stat-card,
+            .info-card,
+            .chart-card {
+                padding: 1rem;
+            }
+
+            /* Info cards grid spacing */
+            .info-cards {
+                gap: 1rem;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>📊 Dashboard OSINT</h2>
+            <p>Sistema di Report Intelligence</p>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active" data-section="overview">
+                <span class="icon">🏠</span>
+                <span class="label">Panoramica</span>
+            </div>
+            <div class="nav-item" data-section="professional">
+                <span class="icon">💼</span>
+                <span class="label">Professionale</span>
+                <span class="badge">92%</span>
+            </div>
+            <div class="nav-item" data-section="family">
+                <span class="icon">👨‍👩‍👧‍👦</span>
+                <span class="label">Famiglia</span>
+                <span class="badge">88%</span>
+            </div>
+            <div class="nav-item" data-section="lifestyle">
+                <span class="icon">🎯</span>
+                <span class="label">Stile di Vita</span>
+                <span class="badge">75%</span>
+            </div>
+            <div class="nav-item" data-section="education">
+                <span class="icon">🎓</span>
+                <span class="label">Formazione</span>
+                <span class="badge">85%</span>
+            </div>
+            <div class="nav-item" data-section="social">
+                <span class="icon">🌐</span>
+                <span class="label">Reti Sociali</span>
+                <span class="badge">90%</span>
+            </div>
+            <div class="nav-item" data-section="wealth">
+                <span class="icon">💰</span>
+                <span class="label">Analisi Patrimonio</span>
+                <span class="badge">86%</span>
+            </div>
+            <div class="nav-item" data-section="content">
+                <span class="icon">📸</span>
+                <span class="label">Analisi Contenuti</span>
+                <span class="badge">72%</span>
+            </div>
+            <div class="nav-item" data-section="workmodel">
+                <span class="icon">🏢</span>
+                <span class="label">Modello Lavorativo</span>
+                <span class="badge">70%</span>
+            </div>
+            <div class="nav-item" data-section="vision">
+                <span class="icon">🎯</span>
+                <span class="label">Visione e Obiettivi</span>
+                <span class="badge">68%</span>
+            </div>
+            <div class="nav-item" data-section="needs">
+                <span class="icon">🎯</span>
+                <span class="label">Mappatura Bisogni</span>
+                <span class="badge">82%</span>
+            </div>
+            <div class="nav-item" data-section="engagement">
+                <span class="icon">💬</span>
+                <span class="label">Coinvolgimento</span>
+                <span class="badge">76%</span>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-title">
+                <h1 id="page-title">Dashboard Panoramica</h1>
+                <p id="page-subtitle">Analisi completa del profilo target</p>
+            </div>
+            <div class="top-bar-actions">
+                <button class="btn btn-outline">📥 Esporta PDF</button>
+                <button class="btn btn-primary">↻ Aggiorna Dati</button>
+            </div>
+        </div>
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Panoramica Section -->
+            <div class="section-view active" id="overview-section">
+                <div class="stats-grid">
+                    <div class="stat-card" style="border-left-color: #2563eb;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">85</div>
+                                <div class="stat-card-label">Punteggio Complessivo</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                                ⭐
+                            </div>
+                        </div>
+                        <div class="stat-card-trend trend-up">
+                            <span>↑ 12%</span>
+                            <span>rispetto all'ultima analisi</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #10b981;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">94%</div>
+                                <div class="stat-card-label">Completezza Dati</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                📊
+                            </div>
+                        </div>
+                        <div class="stat-card-trend trend-up">
+                            <span>↑ 8%</span>
+                            <span>più dati raccolti</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #8b5cf6;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">247</div>
+                                <div class="stat-card-label">Punti Dati</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                                🔍
+                            </div>
+                        </div>
+                        <div class="stat-card-trend trend-up">
+                            <span>↑ 34</span>
+                            <span>nuovi insight</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #f59e0b;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">12</div>
+                                <div class="stat-card-label">Sezioni Attive</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                                📁
+                            </div>
+                        </div>
+                        <div class="stat-card-trend">
+                            <span>Tutte le sezioni analizzate</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <div>
+                            <div class="chart-card-title">Analisi Completezza Sezioni</div>
+                            <div class="chart-card-subtitle">Confidence score per categoria</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-grid two-column" style="grid-template-columns: 1fr 1fr;">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-card-title">Distribuzione Fonti Dati</div>
+                                <div class="chart-card-subtitle">Breakdown by platform</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="sourcesChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-card-title">Attività Cronologia</div>
+                                <div class="chart-card-subtitle">Data collection over time</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sezione Professionale -->
+            <div class="section-view" id="professional-section">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card" style="border-left-color: #8b5cf6;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">Senior</div>
+                                <div class="stat-card-label">Livello Carriera</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                                💼
+                            </div>
+                        </div>
+                        <div class="stat-card-trend">
+                            <span>8 anni di esperienza</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #2563eb;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">€80-120k</div>
+                                <div class="stat-card-label">Fascia Salariale (stima)</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(37, 99, 235, 0.1); color: #2563eb;">
+                                💰
+                            </div>
+                        </div>
+                        <div class="stat-card-trend trend-up">
+                            <span>↑ 15%</span>
+                            <span>rispetto alla media del settore</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #10b981;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">12</div>
+                                <div class="stat-card-label">Competenze Chiave</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                                🎯
+                            </div>
+                        </div>
+                        <div class="stat-card-trend">
+                            <span>Tecnologia e Leadership</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card" style="border-left-color: #f59e0b;">
+                        <div class="stat-card-header">
+                            <div>
+                                <div class="stat-card-value">3</div>
+                                <div class="stat-card-label">Certificazioni</div>
+                            </div>
+                            <div class="stat-card-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                                🏆
+                            </div>
+                        </div>
+                        <div class="stat-card-trend">
+                            <span>MBA, Agile, PMP</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="chart-grid two-column" style="grid-template-columns: 2fr 1fr; margin-bottom: 1.5rem;">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-card-title">Cronologia Carriera</div>
+                                <div class="chart-card-subtitle">Progressione di carriera negli anni</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="careerTimelineChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-card-title">Distribuzione Settoriale</div>
+                                <div class="chart-card-subtitle">Experience by industry</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="sectorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Cards -->
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="info-card-title">Current Position</div>
+                        <div class="info-card-content">
+                            <ul class="info-card-list">
+                                <li>
+                                    <span><strong>Ruolo</strong></span>
+                                    <span>Manager Senior</span>
+                                </li>
+                                <li>
+                                    <span><strong>Azienda</strong></span>
+                                    <span>Tech Corp SRL</span>
+                                </li>
+                                <li>
+                                    <span><strong>Settore</strong></span>
+                                    <span>Tecnologia dell'Informazione</span>
+                                </li>
+                                <li>
+                                    <span><strong>Dal</strong></span>
+                                    <span>Gennaio 2017</span>
+                                </li>
+                                <li>
+                                    <span><strong>Dimensione Team</strong></span>
+                                    <span>20+ persone</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-card-title">Competenze Chiave</div>
+                        <div class="info-card-content">
+                            <div style="display: flex; flex-wrap: gap; gap: 0.5rem;">
+                                <span class="badge badge-primary">Leadership</span>
+                                <span class="badge badge-primary">Gestione Progetti</span>
+                                <span class="badge badge-primary">Strategia Digitale</span>
+                                <span class="badge badge-primary">Innovazione</span>
+                                <span class="badge badge-primary">Agile</span>
+                                <span class="badge badge-primary">Costruzione Team</span>
+                            </div>
+                            <div style="margin-top: 1.5rem;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 0.875rem; font-weight: 600;">Leadership</span>
+                                    <span style="font-size: 0.875rem; color: var(--gray);">95%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 95%;"></div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; margin-top: 1rem;">
+                                    <span style="font-size: 0.875rem; font-weight: 600;">Competenze Tecniche</span>
+                                    <span style="font-size: 0.875rem; color: var(--gray);">88%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 88%;"></div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; margin-top: 1rem;">
+                                    <span style="font-size: 0.875rem; font-weight: 600;">Comunicazione</span>
+                                    <span style="font-size: 0.875rem; color: var(--gray);">92%</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 92%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-card-title">Punti Salienti Carriera</div>
+                        <div class="info-card-content">
+                            <ul style="list-style: none; padding: 0;">
+                                <li style="padding: 0.75rem 0; border-bottom: 1px solid #e2e8f0;">
+                                    <div style="display: flex; gap: 1rem;">
+                                        <span style="color: var(--primary); font-size: 1.5rem;">🏆</span>
+                                        <div>
+                                            <div style="font-weight: 600; margin-bottom: 0.25rem;">Trasformazione Digitale Lead</div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Led company-wide digital initiative (2020-2022)</div>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li style="padding: 0.75rem 0; border-bottom: 1px solid #e2e8f0;">
+                                    <div style="display: flex; gap: 1rem;">
+                                        <span style="color: var(--success); font-size: 1.5rem;">📈</span>
+                                        <div>
+                                            <div style="font-weight: 600; margin-bottom: 0.25rem;">Crescita Team</div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Scaled team from 5 to 25 members</div>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li style="padding: 0.75rem 0;">
+                                    <div style="display: flex; gap: 1rem;">
+                                        <span style="color: var(--secondary); font-size: 1.5rem;">💡</span>
+                                        <div>
+                                            <div style="font-weight: 600; margin-bottom: 0.25rem;">Premio Innovazione</div>
+                                            <div style="font-size: 0.875rem; color: var(--gray);">Miglior Progetto Innovativo 2021</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Career History Table -->
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Periodo</th>
+                                <th>Azienda</th>
+                                <th>Ruolo</th>
+                                <th>Settore</th>
+                                <th>Livello</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>2017 - Presente</strong></td>
+                                <td>Tech Corp SRL</td>
+                                <td>Manager Senior</td>
+                                <td>IT</td>
+                                <td><span class="badge badge-success">Senior</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>2014 - 2017</strong></td>
+                                <td>Digital Solutions</td>
+                                <td>Manager di Progetto</td>
+                                <td>Consulting</td>
+                                <td><span class="badge badge-primary">Medio</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>2010 - 2014</strong></td>
+                                <td>Gruppo Consulenza</td>
+                                <td>Consulente IT</td>
+                                <td>IT Services</td>
+                                <td><span class="badge badge-warning">Junior</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+    <!-- Sezione Famiglia -->
+    <div class="section-view" id="family-section">
+        <div class="section-header">
+            <h2>Analisi Nucleo Familiare</h2>
+            <p>Composizione familiare e situazione abitativa</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">👨‍👩‍👧‍👦</div>
+                <div class="stat-card-value">4</div>
+                <div class="stat-card-label">Membri Famiglia</div>
+                <div class="stat-card-change positive">Nucleo stabile</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #06b6d4;">
+                <div class="stat-card-icon">👶</div>
+                <div class="stat-card-value">2</div>
+                <div class="stat-card-label">Figli</div>
+                <div class="stat-card-change">8 e 12 anni</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">🏠</div>
+                <div class="stat-card-value">Proprietà</div>
+                <div class="stat-card-label">Tipo Residenza</div>
+                <div class="stat-card-change positive">Mutuo in corso</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">📍</div>
+                <div class="stat-card-value">8</div>
+                <div class="stat-card-label">Anni nella località</div>
+                <div class="stat-card-change">Milano, Zona Centrale</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="chart-grid two-column">
+            <!-- Grafico a Torta Composizione Nucleo Familiare -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Composizione Nucleo</h3>
+                    <span class="badge badge-purple">4 membri</span>
+                </div>
+                <div style="height: 300px;">
+                    <canvas id="householdCompositionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Residence Timeline Line Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Cronologia Residenza</h3>
+                    <span class="badge badge-blue">8 anni</span>
+                </div>
+                <div style="height: 300px;">
+                    <canvas id="residenceTimelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Scheda Membri Famiglia -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">👨‍👩‍👧‍👦</div>
+                        <h3>Membri Famiglia</h3>
+                    </div>
+                    <span class="badge badge-purple">Nucleo completo</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Coniuge</span>
+                        <span class="detail-value">
+                            <strong>Maria Rossi</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">42 anni</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Figlio 1</span>
+                        <span class="detail-value">
+                            <strong>Luca</strong>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">12 anni</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Figlio 2</span>
+                        <span class="detail-value">
+                            <strong>Sofia</strong>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">8 anni</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Animali domestici</span>
+                        <span class="detail-value">
+                            <span class="badge badge-amber">🐕 1 Cane</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Residence Information Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🏠</div>
+                        <h3>Informazioni Residenza</h3>
+                    </div>
+                    <span class="badge badge-green">Proprietà</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Indirizzo</span>
+                        <span class="detail-value"><strong>Via Roma 45, Milano</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tipologia</span>
+                        <span class="detail-value">
+                            Appartamento 120mq
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">4 locali</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Mutuo</span>
+                        <span class="detail-value">
+                            <strong>€280.000</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">residuo</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Scadenza</span>
+                        <span class="detail-value">
+                            <strong>2035</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">12 anni</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rata mensile</span>
+                        <span class="detail-value"><strong>€1.200</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scheda Indicatori Stile di Vita -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(6, 182, 212, 0.1);">📊</div>
+                        <h3>Indicatori Stile di Vita</h3>
+                    </div>
+                    <span class="badge badge-cyan">Famiglia attiva</span>
+                </div>
+                <div class="info-card-content">
+                    <!-- Priorità Formazione Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 600; color: #0f172a;">Priorità Educazione</span>
+                            <span style="color: #2563eb; font-weight: 600;">95%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 95%; background: linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tempo Famiglia Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 600; color: #0f172a;">Tempo Famiglia</span>
+                            <span style="color: #10b981; font-weight: 600;">88%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 88%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Work-Life Balance Progress -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span style="font-weight: 600; color: #0f172a;">Work-Life Balance</span>
+                            <span style="color: #f59e0b; font-weight: 600;">82%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 82%; background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Relazioni Familiari Table -->
+        <div class="data-table">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Relazioni Familiari</h3>
+                <span class="badge badge-purple">4 membri</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Membro</th>
+                        <th>Relazione</th>
+                        <th>Età</th>
+                        <th>Occupazione/Scuola</th>
+                        <th>Stato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Maria Rossi</strong></td>
+                        <td><span class="badge badge-purple">Coniuge</span></td>
+                        <td>42 anni</td>
+                        <td>Architetto</td>
+                        <td><span class="badge badge-green">Attiva</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Luca</strong></td>
+                        <td><span class="badge badge-blue">Figlio</span></td>
+                        <td>12 anni</td>
+                        <td>Scuola Media - Classe 2ª</td>
+                        <td><span class="badge badge-cyan">Studente</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Sofia</strong></td>
+                        <td><span class="badge badge-blue">Figlia</span></td>
+                        <td>8 anni</td>
+                        <td>Scuola Elementare - Classe 3ª</td>
+                        <td><span class="badge badge-cyan">Studente</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sezione Stile di Vita -->
+    <div class="section-view" id="lifestyle-section">
+        <div class="section-header">
+            <h2>Analisi Stile di Vita</h2>
+            <p>Hobby, interessi, viaggi e tempo libero</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">🎨</div>
+                <div class="stat-card-value">5</div>
+                <div class="stat-card-label">Hobby Principali</div>
+                <div class="stat-card-change positive">Attivo</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #06b6d4;">
+                <div class="stat-card-icon">✈️</div>
+                <div class="stat-card-value">6</div>
+                <div class="stat-card-label">Viaggi/Anno</div>
+                <div class="stat-card-change positive">+2 vs 2023</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">⚽</div>
+                <div class="stat-card-value">3</div>
+                <div class="stat-card-label">Sport Praticati</div>
+                <div class="stat-card-change">Regolare</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">🎭</div>
+                <div class="stat-card-value">12</div>
+                <div class="stat-card-label">Eventi Culturali/Anno</div>
+                <div class="stat-card-change positive">Alta partecipazione</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="chart-grid two-column">
+            <!-- Grafico a Torta Distribuzione Tempo Libero -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Distribuzione Tempo Libero</h3>
+                    <span class="badge badge-purple">Settimana tipo</span>
+                </div>
+                <div style="height: 300px;">
+                    <canvas id="freeTimeDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Grafico a Barre Cronologia Viaggi -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Cronologia Viaggi</h3>
+                    <span class="badge badge-blue">Ultimi 12 mesi</span>
+                </div>
+                <div style="height: 300px;">
+                    <canvas id="travelTimelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Hobbies & Interests Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">🎨</div>
+                        <h3>Hobby & Interessi</h3>
+                    </div>
+                    <span class="badge badge-purple">5 attività</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Fotografia</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Avanzato</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">8h/settimana</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Lettura</span>
+                        <span class="detail-value">
+                            <span class="badge badge-blue">Appassionato</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">10 libri/anno</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Cucina gourmet</span>
+                        <span class="detail-value">
+                            <span class="badge badge-amber">Intermedio</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Weekend</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Giardinaggio</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Regolare</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Primavera/Estate</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Vino & Enogastronomia</span>
+                        <span class="detail-value">
+                            <span class="badge badge-purple">Esperto</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Sommelier Lv.1</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Travel & Experiences Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(6, 182, 212, 0.1);">✈️</div>
+                        <h3>Viaggi & Esperienze</h3>
+                    </div>
+                    <span class="badge badge-cyan">6 viaggi/anno</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Destinazioni preferite</span>
+                        <span class="detail-value">
+                            <span class="badge badge-sm badge-blue">Europa</span>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.25rem;">Asia</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tipo di viaggio</span>
+                        <span class="detail-value">
+                            <strong>Culturale & Enogastronomico</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Budget medio</span>
+                        <span class="detail-value">
+                            <strong>€3.500 - €5.000</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">per viaggio</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Ultimo viaggio</span>
+                        <span class="detail-value">
+                            <strong>Tokyo, Giappone</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">Gennaio 2025</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Prossimo viaggio</span>
+                        <span class="detail-value">
+                            <strong>Toscana</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Aprile 2025</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sports Activities Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">⚽</div>
+                        <h3>Attività Sportive</h3>
+                    </div>
+                    <span class="badge badge-green">3 discipline</span>
+                </div>
+                <div class="info-card-content">
+                    <!-- Tennis Activity Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Tennis</span>
+                                <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">2x/settimana</span>
+                            </div>
+                            <span style="color: #10b981; font-weight: 600;">90%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 90%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Running Activity Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Running</span>
+                                <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">3x/settimana</span>
+                            </div>
+                            <span style="color: #2563eb; font-weight: 600;">85%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 85%; background: linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Swimming Activity Progress -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Nuoto</span>
+                                <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">1x/settimana</span>
+                            </div>
+                            <span style="color: #06b6d4; font-weight: 600;">70%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 70%; background: linear-gradient(90deg, #06b6d4 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabella Attività Stile di Vita -->
+        <div class="data-table">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Calendario Attività</h3>
+                <span class="badge badge-purple">Ultimi 3 mesi</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Attività</th>
+                        <th>Categoria</th>
+                        <th>Frequenza</th>
+                        <th>Coinvolgimento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Jan 2025</td>
+                        <td><strong>Viaggio Tokyo</strong></td>
+                        <td><span class="badge badge-cyan">Viaggio</span></td>
+                        <td>1 settimana</td>
+                        <td><span class="badge badge-green">Alto</span></td>
+                    </tr>
+                    <tr>
+                        <td>Dec 2024</td>
+                        <td><strong>Corso Sommelier</strong></td>
+                        <td><span class="badge badge-purple">Formazione</span></td>
+                        <td>Weekend</td>
+                        <td><span class="badge badge-green">Alto</span></td>
+                    </tr>
+                    <tr>
+                        <td>Nov 2024</td>
+                        <td><strong>Torneo Tennis Club</strong></td>
+                        <td><span class="badge badge-green">Sport</span></td>
+                        <td>3 giorni</td>
+                        <td><span class="badge badge-blue">Medio</span></td>
+                    </tr>
+                    <tr>
+                        <td>Continuo</td>
+                        <td><strong>Fotografia Paesaggistica</strong></td>
+                        <td><span class="badge badge-amber">Hobby</span></td>
+                        <td>Weekend</td>
+                        <td><span class="badge badge-green">Alto</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Reti Sociali Section -->
+    <div class="section-view" id="social-section">
+        <div class="section-header">
+            <h2>Analisi Reti Sociali</h2>
+            <p>Presenza digitale, connessioni e influenza online</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">👥</div>
+                <div class="stat-card-value">2.8K</div>
+                <div class="stat-card-label">Connessioni Totali</div>
+                <div class="stat-card-change positive">+180 questo mese</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">📊</div>
+                <div class="stat-card-value">42%</div>
+                <div class="stat-card-label">Tasso di Coinvolgimento</div>
+                <div class="stat-card-change positive">+5% vs media</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">🔗</div>
+                <div class="stat-card-value">6</div>
+                <div class="stat-card-label">Piattaforme Attive</div>
+                <div class="stat-card-change">LinkedIn, FB, IG, X, YT, TikTok</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">⭐</div>
+                <div class="stat-card-value">8.2</div>
+                <div class="stat-card-label">Influencer Score</div>
+                <div class="stat-card-change positive">Top 15% settore</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="chart-grid two-column" style="grid-template-columns: 1fr 1fr;">
+            <!-- Grafico Radar Distribuzione Piattaforme -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Distribuzione Piattaforme</h3>
+                    <span class="badge badge-blue">Attività per canale</span>
+                </div>
+                <div style="height: 350px;">
+                    <canvas id="platformDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Network Growth Line Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Crescita Rete</h3>
+                    <span class="badge badge-green">Ultimi 12 mesi</span>
+                </div>
+                <div style="height: 350px;">
+                    <canvas id="networkGrowthChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Scheda Profilo LinkedIn -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">💼</div>
+                        <h3>LinkedIn</h3>
+                    </div>
+                    <span class="badge badge-blue">Piattaforma principale</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Connessioni</span>
+                        <span class="detail-value">
+                            <strong>1.850</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">+65 questo mese</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Follower</span>
+                        <span class="detail-value"><strong>3.240</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Post/mese</span>
+                        <span class="detail-value">
+                            <strong>12</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">3x/settimana</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tasso di Coinvolgimento</span>
+                        <span class="detail-value">
+                            <strong>6.8%</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Eccellente</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">SSI Score</span>
+                        <span class="detail-value">
+                            <strong>78/100</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Top 10% industria</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social Platforms Panoramica Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">📱</div>
+                        <h3>Altre Piattaforme</h3>
+                    </div>
+                    <span class="badge badge-purple">5 canali</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Facebook</span>
+                        <span class="detail-value">
+                            <strong>580 amici</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">Uso moderato</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Instagram</span>
+                        <span class="detail-value">
+                            <strong>1.2K follower</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">Fotografia</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">X (Twitter)</span>
+                        <span class="detail-value">
+                            <strong>450 follower</strong>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">Settore tecnologico</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">YouTube</span>
+                        <span class="detail-value">
+                            <strong>280 iscritti</strong>
+                            <span class="badge badge-sm badge-red" style="margin-left: 0.5rem;">Tutorial foto</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">TikTok</span>
+                        <span class="detail-value">
+                            <strong>150 follower</strong>
+                            <span class="badge badge-sm badge-gray" style="margin-left: 0.5rem;">Occasionale</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Quality Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🎯</div>
+                        <h3>Qualità Network</h3>
+                    </div>
+                    <span class="badge badge-green">Score alto</span>
+                </div>
+                <div class="info-card-content">
+                    <!-- Influence Score Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Influenza</span>
+                                <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Top tier</span>
+                            </div>
+                            <span style="color: #10b981; font-weight: 600;">92%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 92%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Qualità del Coinvolgimento Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Qualità Engagement</span>
+                                <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">Autentico</span>
+                            </div>
+                            <span style="color: #2563eb; font-weight: 600;">88%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 88%; background: linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Content Consistency Progress -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Consistenza Contenuti</span>
+                                <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">Regular</span>
+                            </div>
+                            <span style="color: #f59e0b; font-weight: 600;">85%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 85%; background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Connections Table -->
+        <div class="data-table">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Top Connessioni Influenti</h3>
+                <span class="badge badge-blue">Top 10</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Ruolo</th>
+                        <th>Azienda</th>
+                        <th>Piattaforma</th>
+                        <th>Influenza</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Marco Bianchi</strong></td>
+                        <td>CEO</td>
+                        <td>Tech Innovazione SpA</td>
+                        <td><span class="badge badge-blue">LinkedIn</span></td>
+                        <td><span class="badge badge-green">Alta</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Laura Verdi</strong></td>
+                        <td>VP Marketing</td>
+                        <td>Digital Corp</td>
+                        <td><span class="badge badge-blue">LinkedIn</span></td>
+                        <td><span class="badge badge-green">Alta</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Giuseppe Neri</strong></td>
+                        <td>Founder</td>
+                        <td>StartupHub</td>
+                        <td><span class="badge badge-purple">Multi</span></td>
+                        <td><span class="badge badge-green">Alta</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Sofia Romano</strong></td>
+                        <td>Direttore</td>
+                        <td>Gruppo Consulenza</td>
+                        <td><span class="badge badge-blue">LinkedIn</span></td>
+                        <td><span class="badge badge-blue">Media</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Andrea Conti</strong></td>
+                        <td>Influencer</td>
+                        <td>Freelance</td>
+                        <td><span class="badge badge-amber">Instagram</span></td>
+                        <td><span class="badge badge-blue">Media</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Wealth Section -->
+    <div class="section-view" id="wealth-section">
+        <div class="section-header">
+            <h2>Analisi Patrimoniale & Economica</h2>
+            <p>Indicatori economici, asset e capacità di spesa</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">💰</div>
+                <div class="stat-card-value">€450K</div>
+                <div class="stat-card-label">Patrimonio Stimato</div>
+                <div class="stat-card-change positive">+12% YoY</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">💵</div>
+                <div class="stat-card-value">€95K</div>
+                <div class="stat-card-label">Reddito Annuo Stimato</div>
+                <div class="stat-card-change positive">Fascia alta</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">📈</div>
+                <div class="stat-card-value">€180K</div>
+                <div class="stat-card-label">Investimenti Finanziari</div>
+                <div class="stat-card-change positive">Diversificato</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">🏦</div>
+                <div class="stat-card-value">8.5</div>
+                <div class="stat-card-label">Punteggio Credito (1-10)</div>
+                <div class="stat-card-change positive">Eccellente</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="chart-grid two-column" style="grid-template-columns: 1fr 1fr;">
+            <!-- Grafico a Torta Distribuzione Patrimonio -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Distribuzione Patrimonio</h3>
+                    <span class="badge badge-green">Patrimonio totale</span>
+                </div>
+                <div style="height: 350px;">
+                    <canvas id="assetDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Wealth Evolution Line Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Evoluzione Patrimonio</h3>
+                    <span class="badge badge-blue">Ultimi 5 anni</span>
+                </div>
+                <div style="height: 350px;">
+                    <canvas id="wealthEvolutionChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Real Estate Assets Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🏡</div>
+                        <h3>Patrimonio Immobiliare</h3>
+                    </div>
+                    <span class="badge badge-green">€450K</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Residenza principale</span>
+                        <span class="detail-value">
+                            <strong>€450.000</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Proprietà</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Mutuo residuo</span>
+                        <span class="detail-value">
+                            <strong>€280.000</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">62% LTV</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Equity netta</span>
+                        <span class="detail-value">
+                            <strong>€170.000</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">38%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Valutazione</span>
+                        <span class="detail-value">
+                            <strong>+€70K</strong>
+                            <span style="color: #10b981; font-size: 0.875rem; margin-left: 0.5rem;">da acquisto 2017</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Località</span>
+                        <span class="detail-value">
+                            <strong>Milano, Zona Centrale</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">Prima fascia</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Financial Investments Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">📊</div>
+                        <h3>Investimenti Finanziari</h3>
+                    </div>
+                    <span class="badge badge-purple">€180K</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">ETF & Fondi</span>
+                        <span class="detail-value">
+                            <strong>€85.000</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">47%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Azioni</span>
+                        <span class="detail-value">
+                            <strong>€50.000</strong>
+                            <span class="badge badge-sm badge-purple" style="margin-left: 0.5rem;">28%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Obbligazioni</span>
+                        <span class="detail-value">
+                            <strong>€30.000</strong>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">17%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Liquidità</span>
+                        <span class="detail-value">
+                            <strong>€15.000</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">8%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Rendimento medio</span>
+                        <span class="detail-value">
+                            <strong>+7.8%</strong>
+                            <span style="color: #10b981; font-size: 0.875rem; margin-left: 0.5rem;">annuo</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Income & Spending Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">💳</div>
+                        <h3>Reddito & Spesa</h3>
+                    </div>
+                    <span class="badge badge-blue">Mensile</span>
+                </div>
+                <div class="info-card-content">
+                    <!-- Savings Rate Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Tasso Risparmio</span>
+                                <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">€2.5K/mese</span>
+                            </div>
+                            <span style="color: #10b981; font-weight: 600;">32%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 32%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Fixed Expenses Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Spese Fisse</span>
+                                <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">€3.2K/mese</span>
+                            </div>
+                            <span style="color: #2563eb; font-weight: 600;">40%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 40%; background: linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Discretionary Spending Progress -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Spese Discrezionali</span>
+                                <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">€2.2K/mese</span>
+                            </div>
+                            <span style="color: #f59e0b; font-weight: 600;">28%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 28%; background: linear-gradient(90deg, #f59e0b 0%, #ef4444 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financial Health Table -->
+        <div class="data-table">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Indicatori Salute Finanziaria</h3>
+                <span class="badge badge-green">Score: 8.5/10</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indicatore</th>
+                        <th>Valore</th>
+                        <th>Riferimento</th>
+                        <th>Stato</th>
+                        <th>Tendenza</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Debt-to-Income Ratio</strong></td>
+                        <td>18%</td>
+                        <td>&lt; 36%</td>
+                        <td><span class="badge badge-green">Eccellente</span></td>
+                        <td><span style="color: #10b981;">↓ -2%</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Emergency Fund</strong></td>
+                        <td>12 mesi</td>
+                        <td>6-12 mesi</td>
+                        <td><span class="badge badge-green">Ottimo</span></td>
+                        <td><span style="color: #10b981;">↑ +2 mesi</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Crescita Patrimonio Netto</strong></td>
+                        <td>+12% YoY</td>
+                        <td>+8-10%</td>
+                        <td><span class="badge badge-green">Superiore</span></td>
+                        <td><span style="color: #10b981;">↑ +3%</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Investment Diversification</strong></td>
+                        <td>Alta</td>
+                        <td>Media-Alta</td>
+                        <td><span class="badge badge-blue">Buona</span></td>
+                        <td><span style="color: #2563eb;">→ Stabile</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Punteggio Credito</strong></td>
+                        <td>8.5/10</td>
+                        <td>&gt; 7.0</td>
+                        <td><span class="badge badge-green">Eccellente</span></td>
+                        <td><span style="color: #10b981;">↑ +0.3</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Education Section -->
+    <div class="section-view" id="education-section">
+        <div class="section-header">
+            <h2>Percorso Formativo</h2>
+            <p>Educazione, certificazioni e formazione continua</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">🎓</div>
+                <div class="stat-card-value">Laurea Magistrale</div>
+                <div class="stat-card-label">Titolo di Studio</div>
+                <div class="stat-card-change positive">110/110 cum laude</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">📜</div>
+                <div class="stat-card-value">8</div>
+                <div class="stat-card-label">Certificazioni</div>
+                <div class="stat-card-change positive">Professionali</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">📚</div>
+                <div class="stat-card-value">25+</div>
+                <div class="stat-card-label">Corsi Completati</div>
+                <div class="stat-card-change">Online & Onsite</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">🏆</div>
+                <div class="stat-card-value">5</div>
+                <div class="stat-card-label">Premi Accademici</div>
+                <div class="stat-card-change positive">Riconoscimenti</div>
+            </div>
+        </div>
+
+        <!-- Education Timeline -->
+        <div class="data-table" style="margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Cronologia Formativa</h3>
+                <span class="badge badge-purple">2003-2025</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Anno</th>
+                        <th>Titolo/Corso</th>
+                        <th>Istituzione</th>
+                        <th>Votazione</th>
+                        <th>Tipologia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2015-2017</td>
+                        <td><strong>Laurea Magistrale in Economia</strong></td>
+                        <td>Università Bocconi, Milano</td>
+                        <td>110/110 cum laude</td>
+                        <td><span class="badge badge-purple">Magistrale</span></td>
+                    </tr>
+                    <tr>
+                        <td>2012-2015</td>
+                        <td><strong>Laurea Triennale in Economia</strong></td>
+                        <td>Università Bocconi, Milano</td>
+                        <td>108/110</td>
+                        <td><span class="badge badge-blue">Triennale</span></td>
+                    </tr>
+                    <tr>
+                        <td>2024</td>
+                        <td><strong>MBA Executive</strong></td>
+                        <td>SDA Bocconi</td>
+                        <td>Eccellente</td>
+                        <td><span class="badge badge-green">Master</span></td>
+                    </tr>
+                    <tr>
+                        <td>2023</td>
+                        <td><strong>Programma Leadership</strong></td>
+                        <td>Harvard Business School</td>
+                        <td>Completato</td>
+                        <td><span class="badge badge-cyan">Executive</span></td>
+                    </tr>
+                    <tr>
+                        <td>2003-2012</td>
+                        <td><strong>Diploma Liceo Scientifico</strong></td>
+                        <td>Liceo Leonardo da Vinci, Milano</td>
+                        <td>98/100</td>
+                        <td><span class="badge badge-amber">Diploma</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Certificazioni Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">📜</div>
+                        <h3>Certificazioni Professionali</h3>
+                    </div>
+                    <span class="badge badge-blue">8 attive</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">PMP - Gestione Progetti</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Attiva</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">2023-2026</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">CFA Level II</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Attiva</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">2022</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">PRINCE2 Practitioner</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Attiva</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">2021</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Scrum Master (PSM I)</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Attiva</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">2020</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Six Sigma Black Belt</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">Attiva</span>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">2019</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Continuous Learning Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">📚</div>
+                        <h3>Formazione Continua</h3>
+                    </div>
+                    <span class="badge badge-green">25+ corsi</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Piattaforme</span>
+                        <span class="detail-value">
+                            <span class="badge badge-sm badge-blue">Coursera</span>
+                            <span class="badge badge-sm badge-purple" style="margin-left: 0.25rem;">Udemy</span>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.25rem;">LinkedIn Learning</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Ore di formazione (2024)</span>
+                        <span class="detail-value"><strong>180 ore</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Aree focus</span>
+                        <span class="detail-value">
+                            <strong>Leadership, Trasformazione Digitale, AI</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Ultimo corso completato</span>
+                        <span class="detail-value">
+                            <strong>AI for Business Leaders</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">Gen 2025</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Investimento annuo</span>
+                        <span class="detail-value"><strong>€5.000+</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scheda Risultati Accademici -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(245, 158, 11, 0.1);">🏆</div>
+                        <h3>Riconoscimenti</h3>
+                    </div>
+                    <span class="badge badge-amber">5 premi</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Borsa di studio Bocconi</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">2015-2017</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Premio Miglior Tesi</span>
+                        <span class="detail-value">
+                            <span class="badge badge-purple">2017</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Dean's List</span>
+                        <span class="detail-value">
+                            <span class="badge badge-blue">2013-2017</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Premio Eccellenza Accademica</span>
+                        <span class="detail-value">
+                            <span class="badge badge-green">2015</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Erasmus Excellence</span>
+                        <span class="detail-value">
+                            <span class="badge badge-cyan">2016</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Section -->
+    <div class="section-view" id="content-section">
+        <div class="section-header">
+            <h2>Analisi Contenuti</h2>
+            <p>Produzione contenuti, temi e engagement</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">📝</div>
+                <div class="stat-card-value">156</div>
+                <div class="stat-card-label">Post Pubblicati (anno)</div>
+                <div class="stat-card-change positive">+28% vs 2023</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">💬</div>
+                <div class="stat-card-value">6.8%</div>
+                <div class="stat-card-label">Tasso di Coinvolgimento Medio</div>
+                <div class="stat-card-change positive">Top 10%</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">🎯</div>
+                <div class="stat-card-value">8/10</div>
+                <div class="stat-card-label">Punteggio Qualità</div>
+                <div class="stat-card-change positive">Alto valore</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">🔥</div>
+                <div class="stat-card-value">3</div>
+                <div class="stat-card-label">Post Virali</div>
+                <div class="stat-card-change positive">+50K views</div>
+            </div>
+        </div>
+
+        <!-- Content Topics -->
+        <div class="data-table" style="margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #0f172a;">Temi Principali</h3>
+                <span class="badge badge-blue">Top 10</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tema</th>
+                        <th>Articolo</th>
+                        <th>Engagement</th>
+                        <th>Reach</th>
+                        <th>Sentiment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Leadership & Management</strong></td>
+                        <td>42 post</td>
+                        <td>7.2%</td>
+                        <td>85K</td>
+                        <td><span class="badge badge-green">Positivo</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trasformazione Digitale</strong></td>
+                        <td>38 post</td>
+                        <td>6.8%</td>
+                        <td>72K</td>
+                        <td><span class="badge badge-green">Positivo</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Innovazione & Tech</strong></td>
+                        <td>28 post</td>
+                        <td>8.1%</td>
+                        <td>95K</td>
+                        <td><span class="badge badge-green">Positivo</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Crescita Personale</strong></td>
+                        <td>24 post</td>
+                        <td>5.9%</td>
+                        <td>58K</td>
+                        <td><span class="badge badge-blue">Neutro</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Approfondimenti di Settore</strong></td>
+                        <td>24 post</td>
+                        <td>6.5%</td>
+                        <td>68K</td>
+                        <td><span class="badge badge-green">Positivo</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Content Performance Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">📊</div>
+                        <h3>Performance Contenuti</h3>
+                    </div>
+                    <span class="badge badge-blue">Metriche</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Reach totale (2024)</span>
+                        <span class="detail-value"><strong>1.2M views</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Engagement totale</span>
+                        <span class="detail-value"><strong>82K interazioni</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Commenti</span>
+                        <span class="detail-value"><strong>3.2K</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Condivisioni</span>
+                        <span class="detail-value"><strong>8.5K</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Frequenza pubblicazione</span>
+                        <span class="detail-value">
+                            <strong>3x/settimana</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Consistente</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Types Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">🎨</div>
+                        <h3>Tipologie Contenuti</h3>
+                    </div>
+                    <span class="badge badge-purple">Mix</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Articoli Lunghi</span>
+                        <span class="detail-value">
+                            <strong>45%</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">70 post</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Post Brevi</span>
+                        <span class="detail-value">
+                            <strong>30%</strong>
+                            <span class="badge badge-sm badge-purple" style="margin-left: 0.5rem;">47 post</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Video</span>
+                        <span class="detail-value">
+                            <strong>15%</strong>
+                            <span class="badge badge-sm badge-cyan" style="margin-left: 0.5rem;">23 post</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Caroselli</span>
+                        <span class="detail-value">
+                            <strong>10%</strong>
+                            <span class="badge badge-sm badge-amber" style="margin-left: 0.5rem;">16 post</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scheda Post con Migliori Performance -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🏆</div>
+                        <h3>Top 3 Articoli</h3>
+                    </div>
+                    <span class="badge badge-green">Virali</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">"5 Lezioni di Leadership..."</span>
+                        <span class="detail-value">
+                            <strong>125K views</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">12.5% eng</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">"AI in Business 2024"</span>
+                        <span class="detail-value">
+                            <strong>98K views</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">10.2% eng</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">"Trasformazione Digitale..."</span>
+                        <span class="detail-value">
+                            <strong>85K views</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">9.8% eng</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modello Lavorativo Section -->
+    <div class="section-view" id="workmodel-section">
+        <div class="section-header">
+            <h2>Modello Lavorativo</h2>
+            <p>Approccio al lavoro, produttività e work-life balance</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">💼</div>
+                <div class="stat-card-value">Hybrid</div>
+                <div class="stat-card-label">Modalità Lavoro</div>
+                <div class="stat-card-change positive">3 giorni ufficio</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">⏰</div>
+                <div class="stat-card-value">45h</div>
+                <div class="stat-card-label">Ore Settimanali</div>
+                <div class="stat-card-change">Flessibile</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">📈</div>
+                <div class="stat-card-value">92%</div>
+                <div class="stat-card-label">Productivity Score</div>
+                <div class="stat-card-change positive">Top performer</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">⚖️</div>
+                <div class="stat-card-value">8.5/10</div>
+                <div class="stat-card-label">Work-Life Balance</div>
+                <div class="stat-card-change positive">Ottimo</div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Work Preferences Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">⚙️</div>
+                        <h3>Preferenze Lavorative</h3>
+                    </div>
+                    <span class="badge badge-blue">Profilo</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Modalità preferita</span>
+                        <span class="detail-value">
+                            <strong>Hybrid (60% ufficio)</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Orario ottimale</span>
+                        <span class="detail-value">
+                            <strong>8:30 - 18:00</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Flessibile</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Disponibilità viaggi</span>
+                        <span class="detail-value">
+                            <strong>30%</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Alta</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Team preferito</span>
+                        <span class="detail-value">
+                            <strong>5-8 persone</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Stile management</span>
+                        <span class="detail-value">
+                            <strong>Collaborativo & Results-driven</strong>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Productivity Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🎯</div>
+                        <h3>Produttività</h3>
+                    </div>
+                    <span class="badge badge-green">92%</span>
+                </div>
+                <div class="info-card-content">
+                    <!-- Tempo di Concentrazione Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Tempo di Concentrazione</span>
+                                <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">25h/week</span>
+                            </div>
+                            <span style="color: #10b981; font-weight: 600;">88%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 88%; background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Meeting Efficiency Progress -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Meeting Efficiency</span>
+                                <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">10h/week</span>
+                            </div>
+                            <span style="color: #2563eb; font-weight: 600;">92%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 92%; background: linear-gradient(90deg, #2563eb 0%, #8b5cf6 100%);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Completamento Attività Progress -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-weight: 600; color: #0f172a;">Completamento Attività</span>
+                                <span class="badge badge-sm badge-purple" style="margin-left: 0.5rem;">On-time</span>
+                            </div>
+                            <span style="color: #8b5cf6; font-weight: 600;">95%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 95%; background: linear-gradient(90deg, #8b5cf6 0%, #ef4444 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Work-Life Balance Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(245, 158, 11, 0.1);">⚖️</div>
+                        <h3>Work-Life Balance</h3>
+                    </div>
+                    <span class="badge badge-amber">8.5/10</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Settimana media</span>
+                        <span class="detail-value">
+                            <strong>45 ore</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Bilanciato</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Ferie annuali</span>
+                        <span class="detail-value">
+                            <strong>28 giorni</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Utilizzate 100%</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Weekend lavorativi</span>
+                        <span class="detail-value">
+                            <strong>2-3/anno</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Rari</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tempo per hobby</span>
+                        <span class="detail-value">
+                            <strong>15h/settimana</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Soddisfazione</span>
+                        <span class="detail-value">
+                            <strong>9/10</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Molto alta</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vision & Goals Section -->
+    <div class="section-view" id="vision-section">
+        <div class="section-header">
+            <h2>Visione e Obiettivi</h2>
+            <p>Aspirazioni personali, obiettivi a lungo termine e sviluppo futuro</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">🎯</div>
+                <div class="stat-card-value">5 Anni</div>
+                <div class="stat-card-label">Orizzonte Pianificazione</div>
+                <div class="stat-card-change positive">Vision definita</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">🚀</div>
+                <div class="stat-card-value">8</div>
+                <div class="stat-card-label">Obiettivi Attivi</div>
+                <div class="stat-card-change positive">6 in corso</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">📈</div>
+                <div class="stat-card-value">75%</div>
+                <div class="stat-card-label">Tasso Completamento</div>
+                <div class="stat-card-change positive">+12% vs. anno scorso</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">💡</div>
+                <div class="stat-card-value">Alto</div>
+                <div class="stat-card-label">Livello Ambizione</div>
+                <div class="stat-card-change">Crescita esponenziale</div>
+            </div>
+        </div>
+
+        <!-- Goals Timeline -->
+        <div class="data-table" style="margin-bottom: 2rem;">
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Obiettivo</th>
+                            <th>Categoria</th>
+                            <th>Stato</th>
+                            <th>Progresso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>2025 Q1-Q2</strong></td>
+                            <td>Lancio startup nel settore fintech</td>
+                            <td><span class="badge badge-purple">Career</span></td>
+                            <td><span class="badge badge-sm badge-amber">In corso</span></td>
+                            <td><strong>65%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>2025-2026</strong></td>
+                            <td>MBA Executive in Business School top 50</td>
+                            <td><span class="badge badge-blue">Education</span></td>
+                            <td><span class="badge badge-sm badge-green">Pianificato</span></td>
+                            <td><strong>15%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>2026</strong></td>
+                            <td>Acquisto seconda casa (investimento)</td>
+                            <td><span class="badge badge-green">Wealth</span></td>
+                            <td><span class="badge badge-sm badge-green">Pianificato</span></td>
+                            <td><strong>40%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>2027-2028</strong></td>
+                            <td>Espansione startup a livello internazionale</td>
+                            <td><span class="badge badge-purple">Career</span></td>
+                            <td><span class="badge badge-sm badge-blue">Vision</span></td>
+                            <td><strong>5%</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>2030</strong></td>
+                            <td>Indipendenza finanziaria completa</td>
+                            <td><span class="badge badge-green">Wealth</span></td>
+                            <td><span class="badge badge-sm badge-blue">Vision</span></td>
+                            <td><strong>25%</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Personal Vision Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">🌟</div>
+                        <h3>Visione Personale</h3>
+                    </div>
+                    <span class="badge badge-purple">A 5 anni</span>
+                </div>
+                <div class="info-card-content">
+                    <p style="color: #64748b; margin-bottom: 1rem; line-height: 1.6;">
+                        "Diventare leader riconosciuto nel settore fintech, costruendo un'azienda innovativa che
+                        rivoluziona l'accesso ai servizi finanziari per le PMI italiane."
+                    </p>
+                    <div class="detail-row">
+                        <span class="detail-label">Settore target</span>
+                        <span class="detail-value"><strong>Fintech B2B</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Mercato geografico</span>
+                        <span class="detail-value"><strong>Italia → Europa</strong></span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Timeline</span>
+                        <span class="detail-value"><strong>2025-2030</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Career Goals Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">💼</div>
+                        <h3>Obiettivi Professionali</h3>
+                    </div>
+                    <span class="badge badge-blue">3 attivi</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Breve termine (2025)</span>
+                        <span class="detail-value">
+                            <strong>Lancio startup</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 65%; background: linear-gradient(90deg, #8b5cf6 0%, #2563eb 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Medio termine (2026-2027)</span>
+                        <span class="detail-value">
+                            <strong>MBA + Serie A funding</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 30%; background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Lungo termine (2028-2030)</span>
+                        <span class="detail-value">
+                            <strong>Espansione europea + Exit</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 10%; background: linear-gradient(90deg, #10b981 0%, #f59e0b 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Development Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">🌱</div>
+                        <h3>Sviluppo Personale</h3>
+                    </div>
+                    <span class="badge badge-green">Continuo</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Competenze focus</span>
+                        <span class="detail-value">
+                            <strong>Leadership, AI/ML, Finance</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Mentorship</span>
+                        <span class="detail-value">
+                            <strong>2 mentor attivi</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Startup + Finance</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Networking</span>
+                        <span class="detail-value">
+                            <strong>5 eventi/mese</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Fintech, Tech, VC</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Lettura</span>
+                        <span class="detail-value">
+                            <strong>3 libri/mese</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Business, Tech, Bio</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mappatura Bisogni Section -->
+    <div class="section-view" id="needs-section">
+        <div class="section-header">
+            <h2>Mappatura Bisogni</h2>
+            <p>Analisi psicografica e bisogni personali/professionali</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #ef4444;">
+                <div class="stat-card-icon">🧠</div>
+                <div class="stat-card-value">Alto</div>
+                <div class="stat-card-label">Bisogno Autorealizzazione</div>
+                <div class="stat-card-change positive">Maslow Level 5</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">🎖️</div>
+                <div class="stat-card-value">9/10</div>
+                <div class="stat-card-label">Bisogno Status</div>
+                <div class="stat-card-change positive">Leader recognition</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">🔒</div>
+                <div class="stat-card-value">7/10</div>
+                <div class="stat-card-label">Bisogno Sicurezza</div>
+                <div class="stat-card-change">Finanziaria + Professionale</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">👥</div>
+                <div class="stat-card-value">8/10</div>
+                <div class="stat-card-label">Bisogno Appartenenza</div>
+                <div class="stat-card-change positive">Community forte</div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Psychological Needs Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(239, 68, 68, 0.1);">🧠</div>
+                        <h3>Bisogni Psicologici</h3>
+                    </div>
+                    <span class="badge badge-red">Motivazioni Principali</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Autorealizzazione</span>
+                        <span class="detail-value">
+                            <strong>Molto Alto</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 95%; background: linear-gradient(90deg, #ef4444 0%, #8b5cf6 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Riconoscimento sociale</span>
+                        <span class="detail-value">
+                            <strong>Alto</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 85%; background: linear-gradient(90deg, #8b5cf6 0%, #2563eb 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Autonomia e controllo</span>
+                        <span class="detail-value">
+                            <strong>Alto</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 90%; background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Impatto e legacy</span>
+                        <span class="detail-value">
+                            <strong>Molto Alto</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 92%; background: linear-gradient(90deg, #10b981 0%, #f59e0b 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Professional Needs Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">💼</div>
+                        <h3>Bisogni Professionali</h3>
+                    </div>
+                    <span class="badge badge-purple">Focus Carriera</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Crescita e apprendimento</span>
+                        <span class="detail-value">
+                            <strong>Essenziale</strong>
+                            <span class="badge badge-sm badge-purple" style="margin-left: 0.5rem;">Priorità Massima</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Sfide intellettuali</span>
+                        <span class="detail-value">
+                            <strong>Molto importante</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Problemi complessi</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Innovazione e creatività</span>
+                        <span class="detail-value">
+                            <strong>Fondamentale</strong>
+                            <span class="badge badge-sm badge-blue" style="margin-left: 0.5rem;">Ambiente startup</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Leadership opportunità</span>
+                        <span class="detail-value">
+                            <strong>Priorità alta</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Team building</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Compenso economico</span>
+                        <span class="detail-value">
+                            <strong>Importante</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Non primario</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Personal Needs Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">❤️</div>
+                        <h3>Bisogni Personali</h3>
+                    </div>
+                    <span class="badge badge-green">Life Balance</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Stabilità familiare</span>
+                        <span class="detail-value">
+                            <strong>Molto importante</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Priorità alta</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Salute e benessere</span>
+                        <span class="detail-value">
+                            <strong>Essenziale</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Sport 4x/sett</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Tempo di qualità</span>
+                        <span class="detail-value">
+                            <strong>Fondamentale</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Famiglia + Amici</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Esperienze culturali</span>
+                        <span class="detail-value">
+                            <strong>Importante</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Viaggi + Arte</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Sicurezza finanziaria</span>
+                        <span class="detail-value">
+                            <strong>Alta priorità</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Indipendenza</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Maslow Hierarchy Table -->
+        <div class="data-table" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: #0f172a;">Piramide di Maslow - Profilo</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Livello</th>
+                            <th>Bisogno</th>
+                            <th>Soddisfazione</th>
+                            <th>Focus Attuale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>5 - Autorealizzazione</strong></td>
+                            <td>Crescita personale, creatività, visione</td>
+                            <td><span class="badge badge-sm badge-amber">In sviluppo</span></td>
+                            <td><strong>🎯 Focus Primario</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>4 - Stima</strong></td>
+                            <td>Riconoscimento, status, rispetto</td>
+                            <td><span class="badge badge-sm badge-green">Alta</span></td>
+                            <td><strong>Leader settore</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>3 - Appartenenza</strong></td>
+                            <td>Relazioni, comunità, amore</td>
+                            <td><span class="badge badge-sm badge-green">Soddisfatto</span></td>
+                            <td><strong>Famiglia + Network</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>2 - Sicurezza</strong></td>
+                            <td>Stabilità, protezione, risorse</td>
+                            <td><span class="badge badge-sm badge-green">Soddisfatto</span></td>
+                            <td><strong>Economica + Professionale</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>1 - Fisiologici</strong></td>
+                            <td>Salute, cibo, riposo</td>
+                            <td><span class="badge badge-sm badge-green">Soddisfatto</span></td>
+                            <td><strong>Base coperta</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sezione Strategia di Coinvolgimento -->
+    <div class="section-view" id="engagement-section">
+        <div class="section-header">
+            <h2>Strategia di Coinvolgimento</h2>
+            <p>Leve di comunicazione, touchpoint e approcci di vendita consigliati</p>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+            <div class="stat-card" style="border-left-color: #2563eb;">
+                <div class="stat-card-icon">📱</div>
+                <div class="stat-card-value">LinkedIn</div>
+                <div class="stat-card-label">Canale Preferito</div>
+                <div class="stat-card-change positive">85% response rate</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #10b981;">
+                <div class="stat-card-icon">⏰</div>
+                <div class="stat-card-value">9:00-11:00</div>
+                <div class="stat-card-label">Orario Ottimale</div>
+                <div class="stat-card-change">Martedì-Giovedì</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                <div class="stat-card-icon">🎯</div>
+                <div class="stat-card-value">Consultivo</div>
+                <div class="stat-card-label">Approccio Vendita</div>
+                <div class="stat-card-change positive">Value-based</div>
+            </div>
+
+            <div class="stat-card" style="border-left-color: #f59e0b;">
+                <div class="stat-card-icon">💎</div>
+                <div class="stat-card-value">Alta</div>
+                <div class="stat-card-label">Propensione Acquisto</div>
+                <div class="stat-card-change positive">Decision maker</div>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="info-cards">
+            <!-- Canali di Comunicazione Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(37, 99, 235, 0.1);">📢</div>
+                        <h3>Canali di Comunicazione</h3>
+                    </div>
+                    <span class="badge badge-blue">Priorità</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">1. LinkedIn</span>
+                        <span class="detail-value">
+                            <strong>Primario</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 95%; background: linear-gradient(90deg, #2563eb 0%, #10b981 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">2. Email professionale</span>
+                        <span class="detail-value">
+                            <strong>Secondario</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 75%; background: linear-gradient(90deg, #10b981 0%, #f59e0b 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">3. Telefono</span>
+                        <span class="detail-value">
+                            <strong>Dopo introduzione</strong>
+                            <div class="progress-bar" style="margin-top: 0.5rem;">
+                                <div class="progress-fill" style="width: 60%; background: linear-gradient(90deg, #f59e0b 0%, #8b5cf6 100%);"></div>
+                            </div>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">4. Eventi di settore</span>
+                        <span class="detail-value">
+                            <strong>Networking</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Alta efficacia</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategia di Messaggistica Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(139, 92, 246, 0.1);">💬</div>
+                        <h3>Strategia Messaggi</h3>
+                    </div>
+                    <span class="badge badge-purple">Content</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">Tono di voce</span>
+                        <span class="detail-value">
+                            <strong>Professionale, diretto, data-driven</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Contenuto efficace</span>
+                        <span class="detail-value">
+                            <strong>Case studies, ROI, innovazione</strong>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Lunghezza ideale</span>
+                        <span class="detail-value">
+                            <strong>Breve e incisivo</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">150-200 parole</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Call-to-action</span>
+                        <span class="detail-value">
+                            <strong>Chiara e value-based</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Non push vendita</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Follow-up</span>
+                        <span class="detail-value">
+                            <strong>3-5 giorni</strong>
+                            <span class="badge badge-sm badge-purple" style="margin-left: 0.5rem;">Con valore aggiunto</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engagement Triggers Card -->
+            <div class="info-card">
+                <div class="info-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <div class="info-card-icon" style="background: rgba(16, 185, 129, 0.1);">⚡</div>
+                        <h3>Leve di Engagement</h3>
+                    </div>
+                    <span class="badge badge-green">Trigger</span>
+                </div>
+                <div class="info-card-content">
+                    <div class="detail-row">
+                        <span class="detail-label">🎯 Innovazione</span>
+                        <span class="detail-value">
+                            <strong>Primaria</strong>
+                            <span class="badge badge-sm badge-green" style="margin-left: 0.5rem;">Alta risonanza</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">📊 Dati e metriche</span>
+                        <span class="detail-value">
+                            <strong>Molto efficace</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Prove concrete</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">🚀 Crescita scalabile</span>
+                        <span class="detail-value">
+                            <strong>Alto interesse</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Espansione business</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">👥 Networking qualificato</span>
+                        <span class="detail-value">
+                            <strong>Importante</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">C-level connections</span>
+                        </span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">⏱️ Efficienza</span>
+                        <span class="detail-value">
+                            <strong>Rilevante</strong>
+                            <span style="color: #64748b; font-size: 0.875rem; margin-left: 0.5rem;">Time-saving solutions</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales Approach Table -->
+        <div class="data-table" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: #0f172a;">Piano di Contatto Consigliato</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fase</th>
+                            <th>Azione</th>
+                            <th>Canale</th>
+                            <th>Timing</th>
+                            <th>Obiettivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>1. Consapevolezza</strong></td>
+                            <td>Connessione su LinkedIn + messaggio personalizzato</td>
+                            <td><span class="badge badge-blue">LinkedIn</span></td>
+                            <td>Giorno 1</td>
+                            <td>Introduzione + value proposition</td>
+                        </tr>
+                        <tr>
+                            <td><strong>2. Interest</strong></td>
+                            <td>Condivisione case study rilevante</td>
+                            <td><span class="badge badge-blue">LinkedIn</span></td>
+                            <td>Giorno 4-5</td>
+                            <td>Dimostrare expertise + risultati</td>
+                        </tr>
+                        <tr>
+                            <td><strong>3. Consideration</strong></td>
+                            <td>Email con proposta personalizzata</td>
+                            <td><span class="badge badge-green">Email</span></td>
+                            <td>Giorno 10</td>
+                            <td>Presentare soluzione specifica</td>
+                        </tr>
+                        <tr>
+                            <td><strong>4. Intent</strong></td>
+                            <td>Chiamata esplorativa</td>
+                            <td><span class="badge badge-purple">Telefono</span></td>
+                            <td>Giorno 15</td>
+                            <td>Comprendere esigenze + qualificare</td>
+                        </tr>
+                        <tr>
+                            <td><strong>5. Purchase</strong></td>
+                            <td>Meeting consultivo + proposta</td>
+                            <td><span class="badge badge-amber">In persona</span></td>
+                            <td>Giorno 20-25</td>
+                            <td>Chiusura + onboarding</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Best Practices Alert -->
+        <div style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 16px; border-left: 4px solid #2563eb;">
+            <h4 style="color: #0f172a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                💡 <strong>Best Practices - Engagement</strong>
+            </h4>
+            <ul style="color: #64748b; line-height: 1.8; margin: 0; padding-left: 1.5rem;">
+                <li><strong>Personalizzazione:</strong> Riferimenti specifici a progetti/contenuti su LinkedIn del target</li>
+                <li><strong>Prima il valore:</strong> Offrire approfondimenti o contenuti utile prima di chiedere qualcosa</li>
+                <li><strong>Timing:</strong> Evitare lunedì mattina e venerdì pomeriggio - preferire martedì-giovedì 9-11am</li>
+                <li><strong>Prova sociale:</strong> Citare clienti o progetti simili nel settore fintech/tech</li>
+                <li><strong>Follow-up intelligente:</strong> Aggiungere valore ad ogni interazione (articolo, dato, intro)</li>
+                <li><strong>Networking caldo:</strong> Cercare connessioni comuni per introduzione calda</li>
+            </ul>
+        </div>
+    </div>
+
+        </div> <!-- End content-wrapper -->
+    </div> <!-- End main-content -->
+
+    <script>
+        // Logica Navigazione
+        const navItems = document.querySelectorAll('.nav-item');
+        const sections = document.querySelectorAll('.section-view');
+
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const sectionId = item.getAttribute('data-section');
+
+                // Aggiorna voce menu attiva
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+
+                // Aggiorna sezione attiva
+                sections.forEach(section => section.classList.remove('active'));
+                const targetSection = document.getElementById(`${sectionId}-section`);
+                if (targetSection) {
+                    targetSection.classList.add('active');
+                }
+
+                // Aggiorna titolo pagina
+                const label = item.querySelector('.label').textContent;
+                document.getElementById('page-title').textContent = label;
+            });
+        });
+
+        // Inizializza Grafici
+        function initCharts() {
+            // Panoramica Radar Chart
+            const overviewCtx = document.getElementById('overviewChart').getContext('2d');
+            new Chart(overviewCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['Professionale', 'Famiglia', 'Stile di Vita', 'Formazione', 'Sociale', 'Patrimonio', 'Contenuti', 'Lavoro'],
+                    datasets: [{
+                        label: 'Punteggio Affidabilità',
+                        data: [92, 88, 75, 85, 90, 86, 72, 70],
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(37, 99, 235, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(37, 99, 235, 1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                stepSize: 20
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            // Grafico a Ciambella Fonti
+            const sourcesCtx = document.getElementById('sourcesChart').getContext('2d');
+            new Chart(sourcesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['LinkedIn', 'Facebook', 'Instagram', 'Twitter', 'Registri Pubblici', 'Altro'],
+                    datasets: [{
+                        data: [35, 25, 20, 10, 7, 3],
+                        backgroundColor: [
+                            '#2563eb',
+                            '#3b82f6',
+                            '#8b5cf6',
+                            '#06b6d4',
+                            '#10b981',
+                            '#64748b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Grafico Lineare Cronologia
+            const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+            new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Settimana 1', 'Settimana 2', 'Settimana 3', 'Settimana 4'],
+                    datasets: [{
+                        label: 'Punti Dati Raccolti',
+                        data: [45, 89, 156, 247],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Family Section - Grafico a Torta Composizione Nucleo Familiare
+            const householdCompositionCtx = document.getElementById('householdCompositionChart').getContext('2d');
+            new Chart(householdCompositionCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Adulti', 'Figli', 'Animali'],
+                    datasets: [{
+                        data: [2, 2, 1],
+                        backgroundColor: [
+                            '#8b5cf6',
+                            '#06b6d4',
+                            '#f59e0b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Family Section - Residence Timeline Line Chart
+            const residenceTimelineCtx = document.getElementById('residenceTimelineChart').getContext('2d');
+            new Chart(residenceTimelineCtx, {
+                type: 'line',
+                data: {
+                    labels: ['2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025'],
+                    datasets: [{
+                        label: 'Valore Immobile (€)',
+                        data: [380000, 385000, 390000, 395000, 400000, 410000, 420000, 435000, 450000],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }, {
+                        label: 'Mutuo Residuo (€)',
+                        data: [350000, 340000, 330000, 320000, 310000, 300000, 290000, 285000, 280000],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#ef4444',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '€' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Lifestyle Section - Grafico a Torta Distribuzione Tempo Libero
+            const freeTimeDistributionCtx = document.getElementById('freeTimeDistributionChart').getContext('2d');
+            new Chart(freeTimeDistributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Sport', 'Hobby Creativi', 'Viaggi', 'Eventi Culturali', 'Famiglia', 'Altro'],
+                    datasets: [{
+                        data: [25, 20, 15, 12, 20, 8],
+                        backgroundColor: [
+                            '#10b981',
+                            '#8b5cf6',
+                            '#06b6d4',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#64748b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Lifestyle Section - Grafico a Barre Cronologia Viaggi
+            const travelTimelineCtx = document.getElementById('travelTimelineChart').getContext('2d');
+            new Chart(travelTimelineCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'],
+                    datasets: [{
+                        label: 'Giorni di Viaggio',
+                        data: [7, 0, 3, 5, 0, 4, 14, 7, 0, 3, 0, 5],
+                        backgroundColor: [
+                            '#06b6d4',
+                            '#e2e8f0',
+                            '#8b5cf6',
+                            '#10b981',
+                            '#e2e8f0',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#2563eb',
+                            '#e2e8f0',
+                            '#8b5cf6',
+                            '#e2e8f0',
+                            '#06b6d4'
+                        ],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 5
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Reti Sociali Section - Grafico Radar Distribuzione Piattaforme
+            const platformDistributionCtx = document.getElementById('platformDistributionChart').getContext('2d');
+            new Chart(platformDistributionCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['LinkedIn', 'Facebook', 'Instagram', 'Twitter/X', 'YouTube', 'TikTok'],
+                    datasets: [{
+                        label: 'Follower (migliaia)',
+                        data: [3.2, 0.58, 1.2, 0.45, 0.28, 0.15],
+                        backgroundColor: 'rgba(37, 99, 235, 0.2)',
+                        borderColor: '#2563eb',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#2563eb',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#2563eb',
+                        pointRadius: 5
+                    }, {
+                        label: 'Engagement (%)',
+                        data: [6.8, 2.1, 4.5, 3.2, 5.8, 1.5],
+                        backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#8b5cf6',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#8b5cf6',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 2
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Reti Sociali Section - Network Growth Line Chart
+            const networkGrowthCtx = document.getElementById('networkGrowthChart').getContext('2d');
+            new Chart(networkGrowthCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'],
+                    datasets: [{
+                        label: 'LinkedIn Connessioni',
+                        data: [1520, 1560, 1610, 1650, 1690, 1720, 1750, 1780, 1800, 1820, 1840, 1850],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#2563eb',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }, {
+                        label: 'Instagram Follower',
+                        data: [950, 980, 1000, 1030, 1050, 1070, 1090, 1110, 1140, 1170, 1190, 1200],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#8b5cf6',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }, {
+                        label: 'Follower Totali (x10)',
+                        data: [250, 255, 260, 265, 268, 272, 275, 278, 280, 283, 285, 288],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Wealth Section - Grafico a Ciambella Distribuzione Patrimonio
+            const assetDistributionCtx = document.getElementById('assetDistributionChart').getContext('2d');
+            new Chart(assetDistributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Immobiliare (equity)', 'ETF & Fondi', 'Azioni', 'Obbligazioni', 'Liquidità'],
+                    datasets: [{
+                        data: [170, 85, 50, 30, 15],
+                        backgroundColor: [
+                            '#10b981',
+                            '#2563eb',
+                            '#8b5cf6',
+                            '#06b6d4',
+                            '#f59e0b'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return label + ': €' + value + 'K (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Wealth Section - Wealth Evolution Line Chart
+            const wealthEvolutionCtx = document.getElementById('wealthEvolutionChart').getContext('2d');
+            new Chart(wealthEvolutionCtx, {
+                type: 'line',
+                data: {
+                    labels: ['2020', '2021', '2022', '2023', '2024', '2025'],
+                    datasets: [{
+                        label: 'Patrimonio Netto (€K)',
+                        data: [280, 320, 360, 400, 435, 450],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 3,
+                        pointRadius: 6
+                    }, {
+                        label: 'Investimenti Finanziari (€K)',
+                        data: [95, 110, 130, 150, 165, 180],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#2563eb',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 3,
+                        pointRadius: 6
+                    }, {
+                        label: 'Equity Immobiliare (€K)',
+                        data: [30, 60, 95, 125, 150, 170],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#8b5cf6',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 3,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '€' + value + 'K';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Inizializza al caricamento pagina
+        window.addEventListener('load', () => {
+            initCharts();
+        });
+    </script>
+</body>
+</html>

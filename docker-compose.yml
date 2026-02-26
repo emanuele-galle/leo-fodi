@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leo-fodi
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - traefik-public
+      - panel-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.leo-fodi.rule=Host(`leo-fodi.fodivps2.cloud`)"
+      - "traefik.http.routers.leo-fodi.entrypoints=websecure"
+      - "traefik.http.routers.leo-fodi.tls.certresolver=letsencrypt"
+      - "traefik.http.services.leo-fodi.loadbalancer.server.port=3000"
+
+networks:
+  traefik-public:
+    external: true
+  panel-internal:
+    external: true
