@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runFinancialWorkflow } from '@/lib/ai/financial-planner'
+import { getServerUser } from '@/lib/auth/server'
 import type { ErrorResponse } from '@/lib/types'
 
 /**
@@ -12,6 +13,11 @@ import type { ErrorResponse } from '@/lib/types'
  * Create financial plan for a client
  */
 export async function POST(request: NextRequest) {
+  const user = await getServerUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const { clientId } = body

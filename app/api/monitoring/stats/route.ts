@@ -6,8 +6,14 @@
 import { NextResponse } from 'next/server'
 import { apiCache } from '@/lib/cache/api-cache'
 import { costTracker } from '@/lib/monitoring/cost-tracker'
+import { getServerUser } from '@/lib/auth/server'
 
 export async function GET(request: Request) {
+  const user = await getServerUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || 'all'
@@ -87,6 +93,11 @@ export async function GET(request: Request) {
  * Clear cache endpoint (POST)
  */
 export async function POST(request: Request) {
+  const user = await getServerUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const { action, prefix } = body

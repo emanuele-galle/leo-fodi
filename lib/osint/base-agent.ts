@@ -135,9 +135,9 @@ export abstract class BaseOSINTAgent<TResult = any> {
       if (usage) {
         try {
           const totalCost = calculateXAICost(
+            this.config.model,
             usage.prompt_tokens || 0,
-            usage.completion_tokens || 0,
-            this.config.model
+            usage.completion_tokens || 0
           )
 
           await trackTokenUsage({

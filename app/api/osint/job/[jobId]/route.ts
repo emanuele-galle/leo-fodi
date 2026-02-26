@@ -45,15 +45,15 @@ export async function GET(
     return NextResponse.json({
       success: true,
       job: {
-        job_id: job.job_id,
+        job_id: job.jobId,
         status: job.status,
         progress: job.progress,
-        current_phase: job.current_phase,
+        current_phase: job.currentPhase,
         result: job.result,
         error: job.error,
-        created_at: job.created_at,
-        started_at: job.started_at,
-        completed_at: job.completed_at,
+        created_at: job.createdAt,
+        started_at: job.startedAt,
+        completed_at: job.completedAt,
       },
     })
 
