@@ -7,6 +7,23 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://vps-panel-redis:6379
+      - N8N_INTERNAL_URL=http://vps-panel-n8n:5678
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: '1.5'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     networks:
       - traefik-public
       - panel-internal

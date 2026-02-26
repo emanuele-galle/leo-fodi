@@ -4,6 +4,7 @@
  */
 
 import { getCachedAI, setCachedAI } from '@/lib/cache/ai-cache'
+import { n8nWebhooks } from '@/lib/integrations/n8n-webhooks'
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1'
 const DEFAULT_MODEL = process.env.AI_MODEL || 'anthropic/claude-sonnet-4'
@@ -145,6 +146,18 @@ export async function callAI(
 
       const data: AIResponse = await response.json()
       console.log(`[AI] Success - Tokens used: ${data.usage?.total_tokens || 'N/A'}`)
+
+      // Notify N8N for expensive calls (>10k tokens ~ >$0.10)
+      const totalTokens = data.usage?.total_tokens || 0
+      if (totalTokens > 10000) {
+        const estimatedCost = (totalTokens / 1000) * 0.01 // rough estimate
+        n8nWebhooks.notifyCostAlert({
+          totalCostToday: estimatedCost,
+          model: model,
+          tokens: totalTokens,
+          threshold: 0.1,
+        }).catch(() => {})
+      }
 
       // Store successful response in cache (only for low-temperature / deterministic calls)
       if ((options.temperature ?? 0.7) <= 0.1) {

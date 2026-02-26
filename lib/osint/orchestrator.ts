@@ -27,6 +27,7 @@ import type {
 } from './types'
 
 import { DataGatheringCoordinator } from '../scraping/data-gathering-coordinator'
+import { n8nWebhooks } from '@/lib/integrations/n8n-webhooks'
 import type { RawOSINTData } from '../scraping/types'
 import {
   analyzeDataCompleteness,
@@ -306,6 +307,15 @@ export class OSINTOrchestrator {
       console.log(`   - Overall score: ${completeProfile.punteggio_complessivo}/100`)
       console.log(`   - Completeness: ${completeProfile.completezza_profilo}%`)
       console.log(`   - Errors: ${completeProfile.errori.length}`)
+
+      // Notify N8N (fire and forget)
+      n8nWebhooks.notifyOsintComplete({
+        profileId: target.id || '',
+        targetName: `${target.nome} ${target.cognome}`,
+        completenessScore: completeProfile.completezza_profilo,
+        confidenceAvg: completeProfile.punteggio_complessivo,
+        executionMs: executionTime,
+      }).catch(() => {})
 
       return completeProfile
 

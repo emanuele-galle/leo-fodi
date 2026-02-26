@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (!isDevelopment) {
       const clientId = getClientIdentifier(request)
       const { maxRequests, windowMs } = RATE_LIMITS.OSINT_PROFILING
-      const rateLimit = rateLimiter.check(clientId, maxRequests, windowMs)
+      const rateLimit = await rateLimiter.check(clientId, maxRequests, windowMs)
 
       if (!rateLimit.allowed) {
         const resetDate = new Date(rateLimit.resetAt).toISOString()
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     // Enqueue job via pg-boss for durable background processing
     try {
       const boss = await getBoss()
-      await boss.send(QUEUES.OSINT_JOB, { jobId, targetData: target, userId: userId || null })
+      await boss.send(QUEUES.OSINT_JOB, { jobId, targetData: target, userId: userId || null }, { retryLimit: 2, retryDelay: 30 })
       console.log(`[API] Job enqueued to pg-boss queue: ${QUEUES.OSINT_JOB}`)
     } catch (queueError) {
       console.warn(`[API] pg-boss unavailable, falling back to in-process background:`, queueError)

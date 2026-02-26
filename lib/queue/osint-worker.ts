@@ -38,7 +38,10 @@ export async function registerOsintWorker() {
 
   await boss.work<OsintJobData>(
     QUEUES.OSINT_JOB,
-    { batchSize: 2 },
+    {
+      batchSize: 4,
+      teamSize: 4,
+    },
     async (jobs: PgBoss.Job<OsintJobData>[]) => {
       for (const job of jobs) {
         const { jobId, targetData, userId } = job.data

@@ -70,7 +70,7 @@ export class ReflectLoopOptimized {
         // ========== CHECK CACHE (se stesso output di iterazione precedente) ==========
         if (enableCaching) {
           const outputHash = JSON.stringify(output).substring(0, 100)
-          const cached = this.cache.get(outputHash)
+          const cached = await this.cache.get(outputHash)
 
           if (cached && cached.score === state.best_score) {
             console.log(`   💾 Cache hit - output identico, skipping critique`)

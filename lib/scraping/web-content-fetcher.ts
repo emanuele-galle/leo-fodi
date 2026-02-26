@@ -36,7 +36,7 @@ export class WebContentFetcher {
     try {
       // Check cache first
       const cacheKey = `web_content:${url}`
-      const cached = this.cache.get<FetchedContent>(cacheKey)
+      const cached = await this.cache.get<FetchedContent>(cacheKey)
       if (cached) {
         console.log(`[WebFetcher] ✅ Cache hit for: ${url}`)
         return cached

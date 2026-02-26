@@ -153,6 +153,7 @@ model FinancialPlan {
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id])
 
+  @@index([userId, createdAt])
   @@map("financial_plans")
 }
 
@@ -194,6 +195,7 @@ model OsintProfile {
 
   user User? @relation(fields: [userId], references: [id])
 
+  @@index([userId, createdAt])
   @@map("osint_profiles")
 }
 
@@ -236,6 +238,8 @@ model LeadSearch {
   leadSources   LeadSource[]
   aiTokenUsages AiTokenUsage[]
 
+  @@index([userId, createdAt])
+  @@index([status])
   @@map("lead_searches")
 }
 
@@ -298,6 +302,7 @@ model Lead {
   sources        LeadSource[]
   validations    LeadValidation[]
 
+  @@index([searchId, createdAt])
   @@map("leads")
 }
 
@@ -408,6 +413,9 @@ model AiTokenUsage {
   profile Profile?    @relation(fields: [profileId], references: [id])
   search  LeadSearch? @relation(fields: [searchId], references: [id])
 
+  @@index([userId, createdAt])
+  @@index([model])
+  @@index([createdAt])
   @@map("ai_token_usage")
 }
 
@@ -426,5 +434,7 @@ model ApiUsageLog {
 
   user User? @relation(fields: [userId], references: [id])
 
+  @@index([createdAt])
+  @@index([provider])
   @@map("api_usage_logs")
 }

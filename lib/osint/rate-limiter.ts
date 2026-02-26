@@ -1,19 +1,39 @@
 /**
- * Simple In-Memory Rate Limiter
+ * Rate Limiter with Redis sliding window and in-memory fallback
  * Tracks requests per IP/identifier
- * Note: For production, use Redis-based solution for distributed systems
  */
+
+import type Redis from 'ioredis'
+import { getRedisClient } from '../redis'
 
 interface RateLimitEntry {
   count: number
   resetAt: number
 }
 
+const SLIDING_WINDOW_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+redis.call('zremrangebyscore', key, 0, now - window)
+local count = redis.call('zcard', key)
+if count < limit then
+  redis.call('zadd', key, now, now .. math.random())
+  redis.call('expire', key, math.ceil(window / 1000))
+  return 1
+end
+return 0
+`
+
 class RateLimiter {
   private store: Map<string, RateLimitEntry> = new Map()
   private cleanupInterval: NodeJS.Timeout
+  private redis: Redis | null = null
 
   constructor() {
+    this.redis = getRedisClient()
+
     // Cleanup expired entries every 5 minutes
     this.cleanupInterval = setInterval(() => {
       this.cleanup()
@@ -27,7 +47,49 @@ class RateLimiter {
    * @param windowMs - Time window in milliseconds
    * @returns { allowed: boolean, remaining: number, resetAt: number }
    */
-  check(
+  async check(
+    identifier: string,
+    maxRequests: number,
+    windowMs: number
+  ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+    // Try Redis sliding window first
+    if (this.redis) {
+      try {
+        const now = Date.now()
+        const key = `ratelimit:${identifier}`
+        const result = await this.redis.eval(
+          SLIDING_WINDOW_SCRIPT,
+          1,
+          key,
+          now,
+          windowMs,
+          maxRequests
+        ) as number
+
+        const allowed = result === 1
+
+        // Get current count for remaining calculation
+        const count = await this.redis.zcard(key)
+
+        return {
+          allowed,
+          remaining: Math.max(0, maxRequests - count),
+          resetAt: now + windowMs,
+        }
+      } catch (err: any) {
+        console.error('[RateLimiter] Redis error, falling back to in-memory:', err.message)
+        // Fallback to in-memory below
+      }
+    }
+
+    // In-memory fallback
+    return this.checkInMemory(identifier, maxRequests, windowMs)
+  }
+
+  /**
+   * In-memory rate limit check (original logic)
+   */
+  private checkInMemory(
     identifier: string,
     maxRequests: number,
     windowMs: number
@@ -75,6 +137,12 @@ class RateLimiter {
    */
   reset(identifier: string): void {
     this.store.delete(identifier)
+
+    if (this.redis) {
+      this.redis.del(`ratelimit:${identifier}`).catch((err) => {
+        console.error('[RateLimiter] Redis reset error:', err.message)
+      })
+    }
   }
 
   /**

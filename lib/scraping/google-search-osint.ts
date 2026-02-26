@@ -82,7 +82,7 @@ export class GoogleSearchOSINT {
     }
 
     const cacheKey = `google_search:${target.nome}_${target.cognome}`
-    const cached = this.cache.get<GoogleSearchOSINTData>(cacheKey)
+    const cached = await this.cache.get<GoogleSearchOSINTData>(cacheKey)
     if (cached) {
       console.log(`[GoogleSearchOSINT] ✅ Cache hit for: ${target.nome} ${target.cognome}`)
       return cached

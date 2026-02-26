@@ -15,7 +15,7 @@ export async function GET(
     // Rate limiting check
     const clientId = getClientIdentifier(request)
     const { maxRequests, windowMs } = RATE_LIMITS.JOB_STATUS
-    const rateLimit = rateLimiter.check(clientId, maxRequests, windowMs)
+    const rateLimit = await rateLimiter.check(clientId, maxRequests, windowMs)
 
     if (!rateLimit.allowed) {
       return NextResponse.json(

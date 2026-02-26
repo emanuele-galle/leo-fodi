@@ -1,9 +1,12 @@
 /**
- * In-Memory Cache Service
+ * Cache Service with Redis support and in-memory fallback
  *
  * Provides caching for API responses to reduce costs and improve performance
  * TTL-based expiration with automatic cleanup
  */
+
+import type Redis from 'ioredis'
+import { getRedisClient } from '../redis'
 
 export enum CacheTTL {
   SHORT = 5 * 60,        // 5 minutes
@@ -22,9 +25,11 @@ export class CacheService {
   private static instance: CacheService
   private cache: Map<string, CacheEntry<any>>
   private cleanupInterval: NodeJS.Timeout | null = null
+  private redis: Redis | null = null
 
   private constructor() {
     this.cache = new Map()
+    this.redis = getRedisClient()
     this.startCleanup()
   }
 
@@ -41,12 +46,36 @@ export class CacheService {
   set<T>(key: string, value: T, ttl: number = CacheTTL.LONG): void {
     const expiresAt = Date.now() + (ttl * 1000)
     this.cache.set(key, { value, expiresAt })
+
+    if (this.redis) {
+      try {
+        const serialized = JSON.stringify(value)
+        this.redis.set(key, serialized, 'EX', ttl).catch((err) => {
+          console.error('[Cache] Redis set error:', err.message)
+        })
+      } catch (err: any) {
+        console.error('[Cache] Redis serialization error:', err.message)
+      }
+    }
   }
 
   /**
    * Get a value from cache (returns null if expired or not found)
    */
-  get<T>(key: string): T | null {
+  async get<T>(key: string): Promise<T | null> {
+    if (this.redis) {
+      try {
+        const data = await this.redis.get(key)
+        if (data !== null) {
+          return JSON.parse(data) as T
+        }
+        return null
+      } catch (err: any) {
+        console.error('[Cache] Redis get error:', err.message)
+        // Fallback to in-memory
+      }
+    }
+
     const entry = this.cache.get(key)
 
     if (!entry) {
@@ -64,8 +93,8 @@ export class CacheService {
   /**
    * Check if a key exists and is not expired
    */
-  has(key: string): boolean {
-    return this.get(key) !== null
+  async has(key: string): Promise<boolean> {
+    return (await this.get(key)) !== null
   }
 
   /**
@@ -73,6 +102,12 @@ export class CacheService {
    */
   delete(key: string): void {
     this.cache.delete(key)
+
+    if (this.redis) {
+      this.redis.del(key).catch((err) => {
+        console.error('[Cache] Redis del error:', err.message)
+      })
+    }
   }
 
   /**
@@ -80,6 +115,12 @@ export class CacheService {
    */
   clear(): void {
     this.cache.clear()
+
+    if (this.redis) {
+      this.redis.flushdb().catch((err) => {
+        console.error('[Cache] Redis flushdb error:', err.message)
+      })
+    }
   }
 
   /**

@@ -14,7 +14,7 @@ export async function extractFromGooglePlaces(params: {
   limit?: number
 }): Promise<BusinessData[]> {
   const cacheKey = `google:${params.query}:${params.location}`
-  const cached = cache.get<BusinessData[]>(cacheKey)
+  const cached = await cache.get<BusinessData[]>(cacheKey)
 
   if (cached) {
     return cached
