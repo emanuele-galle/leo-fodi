@@ -1,7 +1,7 @@
 /**
- * Adaptive XAI Live Search Strategy
+ * Adaptive Apify Web Search Strategy
  *
- * Sistema intelligente che decide quando e come usare XAI Live Search
+ * Sistema intelligente che decide quando e come usare Apify Web Search
  * in base alla completezza dei dati già raccolti dalle API.
  */
 
@@ -73,7 +73,7 @@ export function analyzeDataCompleteness(rawData: any): {
   } else {
     score += 0
     missingFields.push('linkedin_data')
-    suggestions.push('LinkedIn profile essential - use XAI to search for professional info')
+    suggestions.push('LinkedIn profile essential - use Apify to search for professional info')
   }
 
   // Analisi Instagram (peso 30%)
@@ -86,12 +86,12 @@ export function analyzeDataCompleteness(rawData: any): {
     if (ig.post_recenti?.length > 0) score += 10
     else {
       missingFields.push('instagram_posts')
-      suggestions.push('No Instagram posts - use XAI to search for visual content and lifestyle insights')
+      suggestions.push('No Instagram posts - use Apify to search for visual content and lifestyle insights')
     }
   } else {
     score += 0
     missingFields.push('instagram_data')
-    suggestions.push('Instagram data missing - use XAI to search for social presence')
+    suggestions.push('Instagram data missing - use Apify to search for social presence')
   }
 
   // Analisi Facebook (peso 20%)
@@ -109,7 +109,7 @@ export function analyzeDataCompleteness(rawData: any): {
     score += 10
   } else {
     missingFields.push('google_search')
-    suggestions.push('No public mentions - use XAI to search for articles, news, interviews')
+    suggestions.push('No public mentions - use Apify to search for articles, news, interviews')
   }
 
   // Determina livello (soglie abbassate per attivare FORCE mode più aggressivamente)
@@ -123,7 +123,7 @@ export function analyzeDataCompleteness(rawData: any): {
 }
 
 /**
- * Decide strategia XAI Live Search in base a completezza dati
+ * Decide strategia Apify Web Search in base a completezza dati
  */
 export function getAdaptiveSearchStrategy(
   completeness: DataCompletenessLevel,
@@ -143,7 +143,7 @@ export function getAdaptiveSearchStrategy(
           sources: ['web', 'news', 'x'],
           return_citations: true,
         },
-        reason: 'Critical: API data missing or very scarce. XAI Live Search essential to fill gaps.',
+        reason: 'Critical: API data missing or very scarce. Apify Web Search essential to fill gaps.',
         priority: 'critical',
       }
 
@@ -156,7 +156,7 @@ export function getAdaptiveSearchStrategy(
           sources: ['web', 'news', 'x'],
           return_citations: true,
         },
-        reason: 'High: API data partial. XAI Live Search needed for enrichment and cross-validation.',
+        reason: 'High: API data partial. Apify Web Search needed for enrichment and cross-validation.',
         priority: 'high',
       }
 
@@ -169,7 +169,7 @@ export function getAdaptiveSearchStrategy(
           sources: ['web', 'news', 'x'],
           return_citations: true,
         },
-        reason: 'Medium: API data sufficient. XAI Live Search optional for context and validation.',
+        reason: 'Medium: API data sufficient. Apify Web Search optional for context and validation.',
         priority: 'medium',
       }
 
@@ -182,14 +182,14 @@ export function getAdaptiveSearchStrategy(
           sources: ['web', 'news', 'x'], // Focus su news/articoli pubblici
           return_citations: true,
         },
-        reason: 'Low: API data rich and complete. XAI Live Search for multimedia context and public mentions only.',
+        reason: 'Low: API data rich and complete. Apify Web Search for multimedia context and public mentions only.',
         priority: 'low',
       }
   }
 }
 
 /**
- * Prompt aggiuntivo per XAI quando dati sono scarsi
+ * Prompt aggiuntivo per Apify quando dati sono scarsi
  */
 export function getEnrichmentPrompt(
   missingFields: string[],
@@ -203,7 +203,7 @@ export function getEnrichmentPrompt(
 I seguenti campi sono assenti o incompleti:
 ${missingFields.map(f => `- ${f}`).join('\n')}
 
-🔍 USA XAI LIVE SEARCH per:
+🔍 USA Apify LIVE SEARCH per:
 ${suggestions.map(s => `• ${s}`).join('\n')}`
 
   // Aggiungi sezione email/phone se presenti

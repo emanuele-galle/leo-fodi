@@ -33,6 +33,7 @@ import {
   getAdaptiveSearchStrategy,
   getEnrichmentPrompt,
   logSearchStrategy,
+  DataCompletenessLevel,
 } from './adaptive-search-strategy'
 
 export class OSINTOrchestrator {
@@ -128,6 +129,27 @@ export class OSINTOrchestrator {
         // Store search strategy and enrichment prompt in shared context for agents
         ;(rawData as any)._adaptiveSearchStrategy = searchStrategy
         ;(rawData as any)._enrichmentPrompt = enrichmentPrompt
+
+        // ✅ WEB SEARCH PRE-AGENTS - quando dati scarsi, arricchisce prima degli agenti
+        if (
+          completeness.level === DataCompletenessLevel.EMPTY ||
+          completeness.level === DataCompletenessLevel.SCARCE
+        ) {
+          const numResults = completeness.level === DataCompletenessLevel.EMPTY ? 15 : 10
+          console.log(
+            `\n🌐 [WebSearch] Dati ${completeness.level} → ricerca web pre-agents (${numResults} risultati)`
+          )
+          const webResults = await this.performWebSearch(target, numResults)
+          if (webResults.length > 0) {
+            ;(rawData as any).web_search_results = webResults
+            rawData.fonti_consultate!.push('web_search_preagent')
+            console.log(
+              `✅ [WebSearch] ${webResults.length} risultati → disponibili per tutti gli agenti`
+            )
+          } else {
+            console.log('⚠️ [WebSearch] Nessun risultato trovato')
+          }
+        }
 
         // Aggiungi raw data al context condiviso per gli agenti
         profile.agent_utilizzati!.push('data_gathering')
@@ -642,5 +664,79 @@ export class OSINTOrchestrator {
       estimated_time_ms: 300000, // 5 minuti stima
       estimated_cost_usd: 0.50, // Stima costo API
     }
+  }
+
+  /**
+   * Ricerca web pre-agenti via Apify RAG Web Browser
+   * Chiamato quando i dati scraping sono scarsi/assenti per arricchire il contesto
+   */
+  private async performWebSearch(
+    target: ProfilingTarget,
+    numResults: number
+  ): Promise<Array<{ url: string; title: string; snippet: string }>> {
+    const apiToken = process.env.APIFY_API_TOKEN
+    if (!apiToken) {
+      console.log('[WebSearch] ⚠️ APIFY_API_TOKEN non configurato, skip')
+      return []
+    }
+
+    const fullName = `${target.nome} ${target.cognome}`
+    const queries: string[] = []
+
+    // Query 1: nome + città (massima specificità)
+    if (target.citta) {
+      queries.push(`${fullName} ${target.citta} LinkedIn professione`)
+    } else {
+      queries.push(`${fullName} LinkedIn professione`)
+    }
+
+    // Query 2: nome + menzioni pubbliche
+    queries.push(`${fullName} (intervista OR articolo OR notizia OR profilo)`)
+
+    const allResults: Array<{ url: string; title: string; snippet: string }> = []
+
+    for (const query of queries) {
+      try {
+        const response = await fetch(
+          'https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=' +
+            apiToken,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              maxResults: Math.ceil(numResults / queries.length),
+              outputFormats: ['markdown'],
+            }),
+            signal: AbortSignal.timeout(30000),
+          }
+        )
+
+        if (!response.ok) continue
+
+        const items = (await response.json()) as Array<{
+          url?: string
+          title?: string
+          markdown?: string
+          text?: string
+        }>
+
+        for (const item of items) {
+          if (item.url) {
+            allResults.push({
+              url: item.url,
+              title: item.title || '',
+              snippet: (item.markdown || item.text || '').slice(0, 1000),
+            })
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `[WebSearch] Query fallita: "${query}" — ${error instanceof Error ? error.message : error}`
+        )
+      }
+    }
+
+    return allResults
   }
 }

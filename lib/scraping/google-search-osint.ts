@@ -1,15 +1,14 @@
 /**
  * Google Search OSINT
- * Usa Google Custom Search API o ScrapeCreators Google Search API per trovare menzioni pubbliche del target
+ * Usa Apify RAG Web Browser o Google Custom Search API per trovare menzioni pubbliche del target
  * Scopre: articoli, interviste, profili social alternativi, apparizioni pubbliche
  *
  * PRIORITY:
- * 1. ScrapeCreators Google Search (più affidabile, nessun setup complesso)
+ * 1. Apify RAG Web Browser (più affidabile, nessun setup complesso)
  * 2. Google Custom Search API (richiede setup SearchEngineID)
  */
 
 import { CacheService, CacheTTL } from '@/lib/cache/cache-service'
-import { searchGoogle as scrapeCreatorsSearch } from '@/lib/scrapecreators/client'
 import type { ProfilingTarget } from '../osint/types'
 
 export interface GoogleSearchResult {
@@ -47,8 +46,8 @@ export class GoogleSearchOSINT {
   private apiKey: string | null
   private searchEngineId: string | null
   private enabled: boolean
-  private scrapeCreatorsEnabled: boolean
-  private useScrapecreators: boolean
+  private apifyEnabled: boolean
+  private useApify: boolean
 
   constructor() {
     this.cache = CacheService.getInstance()
@@ -58,17 +57,17 @@ export class GoogleSearchOSINT {
     this.searchEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || null
     this.enabled = !!(this.apiKey && this.searchEngineId)
 
-    // ScrapeCreators API
-    this.scrapeCreatorsEnabled = !!process.env.SCRAPECREATORS_API_KEY
+    // Apify API
+    this.apifyEnabled = !!process.env.APIFY_API_TOKEN
 
-    // Priority: ScrapeCreators > Google Custom Search
-    this.useScrapecreators = this.scrapeCreatorsEnabled
+    // Priority: Apify > Google Custom Search
+    this.useApify = this.apifyEnabled
 
-    if (!this.useScrapecreators && !this.enabled) {
+    if (!this.useApify && !this.enabled) {
       console.warn('[GoogleSearchOSINT] ⚠️ No Google Search API configured (optional feature)')
-      console.warn('   Configure either SCRAPECREATORS_API_KEY or GOOGLE_CUSTOM_SEARCH_API_KEY')
+      console.warn('   Configure either APIFY_API_TOKEN or GOOGLE_CUSTOM_SEARCH_API_KEY')
     } else {
-      const provider = this.useScrapecreators ? 'ScrapeCreators' : 'Google Custom Search'
+      const provider = this.useApify ? 'Apify RAG Web Browser' : 'Google Custom Search'
       console.log(`[GoogleSearchOSINT] ✅ Using ${provider} API`)
     }
   }
@@ -77,7 +76,7 @@ export class GoogleSearchOSINT {
    * Cerca informazioni pubbliche su un target
    */
   async searchPerson(target: ProfilingTarget): Promise<GoogleSearchOSINTData | null> {
-    if (!this.useScrapecreators && !this.enabled) {
+    if (!this.useApify && !this.enabled) {
       console.log('[GoogleSearchOSINT] Skipping - API not configured')
       return null
     }
@@ -91,9 +90,9 @@ export class GoogleSearchOSINT {
 
     console.log(`[GoogleSearchOSINT] 🔍 Searching for: ${target.nome} ${target.cognome}`)
 
-    // Use ScrapeCreators if enabled (priority)
-    if (this.useScrapecreators) {
-      return await this.searchPersonWithScrapeCreators(target, cacheKey)
+    // Use Apify if enabled (priority)
+    if (this.useApify) {
+      return await this.searchPersonWithApify(target, cacheKey)
     }
 
     // Fallback to Google Custom Search
@@ -131,13 +130,15 @@ export class GoogleSearchOSINT {
   }
 
   /**
-   * Cerca informazioni usando ScrapeCreators Google Search API
+   * Cerca informazioni usando Apify RAG Web Browser (sync call)
    */
-  private async searchPersonWithScrapeCreators(
+  private async searchPersonWithApify(
     target: ProfilingTarget,
     cacheKey: string
   ): Promise<GoogleSearchOSINTData | null> {
-    console.log(`[GoogleSearchOSINT] 🔍 Using ScrapeCreators for: ${target.nome} ${target.cognome}`)
+    console.log(`[GoogleSearchOSINT] 🔍 Using Apify RAG Web Browser for: ${target.nome} ${target.cognome}`)
+
+    const apiToken = process.env.APIFY_API_TOKEN
 
     // Genera query di ricerca automatiche
     const queries = this.generateSearchQueries(target)
@@ -148,20 +149,26 @@ export class GoogleSearchOSINT {
     // Esegui max 3 query per evitare costi eccessivi
     for (const query of queries.slice(0, 3)) {
       try {
-        const response = await scrapeCreatorsSearch({
-          query,
-          region: 'IT', // Italian results
-          num_results: 10
-        })
+        const response = await fetch(
+          `https://api.apify.com/v2/acts/apify~rag-web-browser/run-sync-get-dataset-items?token=${apiToken}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, numResults: 10 }),
+            signal: AbortSignal.timeout(30000),
+          }
+        )
 
-        if (response.success && response.results) {
-          // Convert ScrapeCreators format to our format
-          const converted = response.results.map(r => ({
-            title: r.title,
-            link: r.url,
-            snippet: r.description,
-            displayLink: new URL(r.url).hostname,
-            source: this.categorizeSource(r.url),
+        if (response.ok) {
+          const items = await response.json()
+
+          // Convert Apify RAG format to our format
+          const converted = (items as any[]).map(r => ({
+            title: r.title || '',
+            link: r.url || '',
+            snippet: r.text?.substring(0, 200) || '',
+            displayLink: r.url ? new URL(r.url).hostname : '',
+            source: this.categorizeSource(r.url || ''),
           }))
 
           allResults.push(...converted)
@@ -171,7 +178,7 @@ export class GoogleSearchOSINT {
         // Rate limiting: 500ms between queries
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
-        console.error(`[GoogleSearchOSINT] ScrapeCreators query failed: ${query}`, error instanceof Error ? error.message : String(error))
+        console.error(`[GoogleSearchOSINT] Apify query failed: ${query}`, error instanceof Error ? error.message : String(error))
       }
     }
 
@@ -364,6 +371,6 @@ export class GoogleSearchOSINT {
    * Verifica se API è configurata
    */
   isEnabled(): boolean {
-    return this.useScrapecreators || this.enabled
+    return this.useApify || this.enabled
   }
 }

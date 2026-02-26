@@ -294,18 +294,24 @@ function LeadFinderContent() {
     return `${statusText} da ${userName} il ${date}`
   }
 
-  // Filter leads based on contact status
-  const filteredLeads = leads.filter((lead) => {
-    if (statusFilter === 'all') return true
+  // Filter leads based on contact status, then sort by lead_score descending
+  const filteredLeads = leads
+    .filter((lead) => {
+      if (statusFilter === 'all') return true
 
-    const status = contactStatuses[lead.id]?.contact_status
+      const status = contactStatuses[lead.id]?.contact_status
 
-    if (statusFilter === 'none') {
-      return !status || status === 'none'
-    }
+      if (statusFilter === 'none') {
+        return !status || status === 'none'
+      }
 
-    return status === statusFilter
-  })
+      return status === statusFilter
+    })
+    .sort((a, b) => {
+      const scoreA = (a.extra_data as any)?.lead_score ?? -1
+      const scoreB = (b.extra_data as any)?.lead_score ?? -1
+      return scoreB - scoreA
+    })
 
   return (
     <>
@@ -508,6 +514,7 @@ function LeadFinderContent() {
                           <TableHead className="font-bold text-slate-700">Email</TableHead>
                           <TableHead className="font-bold text-slate-700">Sito Web</TableHead>
                           <TableHead className="font-bold text-slate-700">Fonte</TableHead>
+                          <TableHead className="font-bold text-slate-700">Score</TableHead>
                           <TableHead className="font-bold text-slate-700 text-right">Azioni</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -547,6 +554,18 @@ function LeadFinderContent() {
                               <Badge variant="secondary" className="text-xs font-semibold bg-slate-100 text-slate-700">
                                 {lead.fonte_primaria || 'N/D'}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const score = (lead.extra_data as any)?.lead_score
+                                if (score == null) return <span className="text-slate-400 text-xs">-</span>
+                                const colorClass = score > 70 ? 'bg-green-100 text-green-800 border-green-300' : score >= 40 ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-red-100 text-red-800 border-red-300'
+                                return (
+                                  <Badge className={`text-xs font-bold border ${colorClass}`}>
+                                    {score}
+                                  </Badge>
+                                )
+                              })()}
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2 justify-end">
@@ -633,9 +652,17 @@ function LeadFinderContent() {
                               <p className="text-xs text-slate-500 mt-0.5">P.IVA: {lead.partita_iva}</p>
                             )}
                           </div>
-                          <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-700">
-                            {lead.fonte_primaria || 'N/D'}
-                          </Badge>
+                          <div className="flex gap-1.5">
+                            {(() => {
+                              const score = (lead.extra_data as any)?.lead_score
+                              if (score == null) return null
+                              const colorClass = score > 70 ? 'bg-green-100 text-green-800 border-green-300' : score >= 40 ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-red-100 text-red-800 border-red-300'
+                              return <Badge className={`text-xs font-bold border ${colorClass}`}>{score}</Badge>
+                            })()}
+                            <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-700">
+                              {lead.fonte_primaria || 'N/D'}
+                            </Badge>
+                          </div>
                         </div>
 
                         <div className="space-y-2 text-sm">

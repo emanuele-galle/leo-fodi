@@ -12,20 +12,20 @@ export const PRIORITY_INSTRUCTIONS = `
 1. 🥇 **LinkedIn** - Massima affidabilità per carriera, formazione, competenze
 2. 🥈 **Instagram** - Alta affidabilità per lifestyle, interessi, brand
 3. 🥉 **Facebook** - Media affidabilità per info personali e familiari
-4. 🔍 **XAI Live Search (Web + News + X)** - Ottima per verifiche incrociate e notizie pubbliche
+4. 🔍 **Apify API (Web + News + Social)** - Ottima per verifiche incrociate e notizie pubbliche
 5. 🌐 **Web Content** - Affidabilità variabile, usare per conferme
 
 **REGOLE OPERATIVE**:
 
 Per dati QUANTITATIVI (followers, anni esperienza, età, stipendio):
 - ✅ Usa LinkedIn per dati professionali (anni esperienza, aziende, ruoli)
-- ✅ Usa ScrapCreators API (Instagram/Facebook) per dati social (followers, posts)
+- ✅ Usa Apify API (Instagram/Facebook) per dati social (followers, posts)
 - ✅ Se LinkedIn ha il dato, è SEMPRE la fonte primaria per info carriera
 - ❌ NON fare media di valori contrastanti - scegli fonte più affidabile
 - ⚠️  Se differenza >30% tra fonti, segnala nel campo "note" e usa fonte più recente
 
 Per dati QUALITATIVI (ruolo, azienda, titolo, interessi):
-- ✅ LinkedIn > XAI Live Search > Instagram bio > Facebook bio > Web
+- ✅ LinkedIn > Apify Web Search > Instagram bio > Facebook bio > Web
 - ✅ Se fonti contraddicono: usa LinkedIn per info professionale, social per info personale
 - ✅ Se incerto: includi entrambi con nota esplicita sulla fonte
 
@@ -33,7 +33,7 @@ Per CROSS-REFERENCE:
 - ✅ Cerca conferme tra fonti diverse per aumentare confidence_score
 - ✅ Se 3+ fonti confermano lo stesso dato → confidence_score +20
 - ✅ Se fonti contraddicono → confidence_score -15 e documenta contraddizione
-- ✅ Usa XAI Live Search per verificare info dubbie con ricerche web real-time
+- ✅ Usa Apify Web Search per verificare info dubbie con ricerche web real-time
 
 **ESEMPI PRATICI**:
 
@@ -43,9 +43,9 @@ Scenario 1 - Anni Esperienza:
 → SCELTA: LinkedIn (10 anni) - fonte primaria per carriera
 
 Scenario 2 - Followers Instagram:
-- ScrapCreators API: 2558 followers
+- Apify API API: 2558 followers
 - Puppeteer: 7777 followers
-→ SCELTA: ScrapCreators (2558) - API professionale più affidabile
+→ SCELTA: Apify API (2558) - API professionale più affidabile
 
 Scenario 3 - Hobby/Interessi:
 - LinkedIn: "Tech, AI, Startup"
@@ -99,14 +99,14 @@ export const ENABLE_LIVE_SEARCH = {
 export const JSON_RESPONSE_FOOTER = `
 **NOTA SULLE FONTI**:
 - Popola \`fonti_consultate\` con TUTTE le fonti effettivamente analizzate
-- Se usi XAI Live Search, aggiungi "Web Search" alla lista
+- Se usi Apify Web Search, aggiungi "Web Search" alla lista
 - Ordina fonti per priorità: LinkedIn, Instagram, Facebook, Web Search, Web, Deduzione
 
 **EVITA "non_determinato" - REGOLE FONDAMENTALI**:
 1. ❌ NON usare "non_determinato" se hai almeno UNA fonte parziale
 2. ✅ PREFERISCI valori specifici dedotti logicamente da contesto disponibile
 3. ✅ SPECIFICA SEMPRE confidence level (basso/medio/alto) invece di "non_determinato"
-4. ✅ USA XAI Live Search attivamente per colmare vuoti invece di arrenderti
+4. ✅ USA Apify Web Search attivamente per colmare vuoti invece di arrenderti
 5. ✅ ESEMPIO CORRETTO: "Orario: 9-18 (confidence: bassa, dedotto da profilo junior Italia)"
 6. ❌ ESEMPIO ERRATO: "Orario: non_determinato"
 `

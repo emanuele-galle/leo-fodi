@@ -3,7 +3,7 @@
  * System and user prompts for financial planning with XAI
  */
 
-import type { OSINTProfile } from '@/lib/types'
+import type { OSINTProfile, TriggerVita, PrioritaContatto } from '@/lib/types'
 
 /**
  * System Prompt for Financial Planning Agent
@@ -29,6 +29,23 @@ Il tuo compito è analizzare il profilo OSINT di un cliente e creare un piano as
 - **Alta**: Rischi immediati e protezioni base mancanti
 - **Media**: Ottimizzazioni e crescita patrimonio
 - **Bassa**: Pianificazioni long-term e successorie
+
+### Trigger di Vita
+Identifica eventi recenti o prossimi che possono motivare decisioni finanziarie:
+- Nascita figlio → educazione, protezione famiglia
+- Matrimonio/convivenza → patrimonio condiviso, successione
+- Promozione/aumento → previdenza integrativa, investimenti
+- Acquisto immobile → mutuo, assicurazione, LTC
+- Pensione imminente (10 anni) → previdenza, rendita
+- Apertura attività → RC professionale, fondo pensione PMI
+
+### Priorità Contatto
+Calcola un score 1-10 basato su:
+- Età (30-55 = massima priorità per previdenza)
+- Presenza di dipendenti familiari (figli, coniuge)
+- Gap assicurativi evidenti
+- Reddito alto + copertura bassa = urgenza alta
+- Avvicinarsi alla pensione = urgenza alta
 
 ### Focus Fiscale
 Evidenzia sempre benefici fiscali specifici:
@@ -101,6 +118,18 @@ Devi restituire un oggetto JSON con la seguente struttura esatta (6 sezioni):
     "trigger_idoneita": ["string"],
     "checklist_finale": ["string"],
     "script_appuntamento": "string (max 150 parole)"
+  },
+  "trigger_vita": [
+    {
+      "evento": "string (es: figlio, matrimonio, promozione, acquisto casa, pensione)",
+      "rilevanza": "alta" | "media" | "bassa",
+      "opportunita": "string (come questo evento crea opportunità assicurativa/finanziaria)"
+    }
+  ],
+  "priorita_contatto": {
+    "score": number (1-10),
+    "motivo_principale": "string (perché contattare questo cliente ORA)",
+    "gancio_specifico": "string (apertura conversazione personalizzata per professione/settore/situazione del cliente)"
   }
 }
 
@@ -174,6 +203,27 @@ export function generateFinancialUserPrompt(profile: OSINTProfile): string {
   prompt += `- Ruoli: ${profile.identita_presenza_online.ruoli_principali.join(', ')}\n`
   prompt += `- Settore: ${profile.identita_presenza_online.settore_principale}\n`
   prompt += `- Località: ${profile.identita_presenza_online.citta_area}\n\n`
+
+  // Section: Career details (role, company, sector)
+  if (profile.identita_presenza_online.ruoli_principali?.length > 0) {
+    prompt += `## DETTAGLI CARRIERA\n`
+    prompt += `- Ruolo: ${profile.identita_presenza_online.ruoli_principali.join(', ')}\n`
+    prompt += `- Aziende: ${profile.identita_presenza_online.aziende_attuali.join(', ')}\n`
+    prompt += `- Settore: ${profile.identita_presenza_online.settore_principale}\n\n`
+  }
+
+  // Section: Family / life events
+  if (profile.stile_vita.eventi_vita_potenziali?.length > 0) {
+    prompt += `## SITUAZIONE FAMILIARE / EVENTI DI VITA\n`
+    prompt += `- Eventi vita potenziali: ${profile.stile_vita.eventi_vita_potenziali.join(', ')}\n`
+    prompt += `- Valori: ${profile.stile_vita.valori_espressi.join(', ')}\n\n`
+  }
+
+  // Section: Income / wealth indicators
+  if (profile.modello_lavorativo.fonti_ricavo?.length > 0) {
+    prompt += `## INDICATORI PATRIMONIALI\n`
+    prompt += `- Fonti di ricavo: ${profile.modello_lavorativo.fonti_ricavo.join(', ')}\n\n`
+  }
 
   // Section 4: Work model (key for financial planning)
   prompt += `## 2. MODELLO LAVORATIVO\n`

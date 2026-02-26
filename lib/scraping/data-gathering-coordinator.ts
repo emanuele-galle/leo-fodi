@@ -1,18 +1,13 @@
 /**
  * Data Gathering Coordinator
  * Orchestra l'esecuzione parallela di tutti gli scraper specializzati
- * Usa ScrapCreators API + Cheerio web scraping (no Playwright - production ready)
+ * Usa Apify API + Cheerio web scraping (no Playwright - production ready)
  */
 
-import { ScrapCreatorsClient } from './scrapcreators-client'
 import { WebsiteContactScraper } from './website-contact-scraper'
 import { WebContentFetcher } from './web-content-fetcher'
 import { GoogleSearchOSINT } from './google-search-osint'
 import { WebsiteContentAnalyzer } from './website-content-analyzer'
-// ✅ REMOVED: VisionAnalyzer - XAI Live Search provides better semantic analysis
-// ✅ REMOVED: Puppeteer extractors - now using ONLY ScrapCreators API + XAI Live Search
-// Puppeteer era lento (15-30s), fragile (DOM changes), e costoso da mantenere (cookies)
-// ScrapCreators è 5-10x più veloce, 95% reliability, e zero manutenzione
 import type {
   RawOSINTData,
   LinkedInProfileData,
@@ -24,8 +19,6 @@ import type {
 import type { ProfilingTarget } from '../osint/types'
 
 export class DataGatheringCoordinator {
-  private scrapCreators = new ScrapCreatorsClient()
-  // ✅ REMOVED: Puppeteer instances - using only ScrapCreators API
   private websiteScraper = new WebsiteContactScraper()
   private webFetcher = new WebContentFetcher()
   private googleSearch = new GoogleSearchOSINT()
@@ -203,8 +196,8 @@ export class DataGatheringCoordinator {
             const transformed = result.data as InstagramProfileData
 
             // ✅ REMOVED: Vision AI Analysis
-            // XAI Live Search ora fornisce analisi semantica migliore e più veloce
-            // Nessun bisogno di analizzare screenshot - i dati testuali sono sufficienti
+            // Web search provides better semantic analysis
+            // No need to analyze screenshots - textual data is sufficient
 
             rawData.instagram_data = transformed
             console.log(`✅ [DataGathering] Instagram data collected and transformed`)
@@ -279,72 +272,113 @@ export class DataGatheringCoordinator {
 
   /**
    * Scrape LinkedIn profile
-   * STRATEGY: Use ONLY ScrapCreators API (Puppeteer removed completely)
+   * STRATEGY: Use Apify dev_fusion~Linkedin-Profile-Scraper (async with polling)
    *
    * Note: LinkedIn has strong protections against scraping.
-   * ScrapCreators may return 404 errors due to LinkedIn anti-scraping measures.
    * Falls back gracefully to XAI Live Search for profile enrichment.
    */
   private async scrapeLinkedIn(
     url: string
   ): Promise<ScraperResult<LinkedInProfileData>> {
     const startTime = Date.now()
+    const apiToken = process.env.APIFY_API_TOKEN
 
-    console.log(`[DataGathering] 🔍 Scraping LinkedIn with ScrapCreators API: ${url}`)
+    console.log(`[DataGathering] 🔍 Scraping LinkedIn with Apify API: ${url}`)
+
+    if (!apiToken) {
+      return {
+        success: false,
+        error: {
+          code: 'NOT_CONFIGURED' as any,
+          message: 'APIFY_API_TOKEN not configured',
+          retryable: false,
+        },
+        metadata: { tentativo: 1, tempo_ms: Date.now() - startTime, fonte: 'Apify (not configured)' },
+      }
+    }
 
     try {
-      // Try ScrapCreators API
-      const scData = await this.scrapCreators.scrapeLinkedIn(url)
-
-      if (scData) {
-        console.log(`✅ [DataGathering] LinkedIn data collected via ScrapCreators`)
-        console.log(`   - Experience: ${scData.esperienze?.length || 0} roles`)
-        console.log(`   - Education: ${scData.formazione?.length || 0} schools`)
-        console.log(`   - Skills: ${scData.competenze?.length || 0} skills`)
-        console.log(`   - Connections: ${scData.numero_connessioni || 'N/A'}`)
-
-        return {
-          success: true,
-          data: scData,
-          metadata: {
-            tentativo: 1,
-            tempo_ms: Date.now() - startTime,
-            fonte: 'ScrapCreators',
-          },
+      // Start Apify run
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/dev_fusion~Linkedin-Profile-Scraper/runs?token=${apiToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileUrls: [url] }),
         }
+      )
+
+      if (!runRes.ok) {
+        throw new Error(`Apify start failed: ${runRes.status} ${runRes.statusText}`)
+      }
+
+      const { data: { id: runId } } = await runRes.json()
+
+      // Poll until finished (max 60s, poll every 3s)
+      const maxWait = 60000
+      const pollInterval = 3000
+      let elapsed = 0
+
+      while (elapsed < maxWait) {
+        const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apiToken}`)
+        const { data } = await statusRes.json()
+
+        if (data.status === 'SUCCEEDED') break
+        if (data.status === 'FAILED' || data.status === 'ABORTED') {
+          throw new Error(`Apify run ${data.status}`)
+        }
+
+        await new Promise(r => setTimeout(r, pollInterval))
+        elapsed += pollInterval
+      }
+
+      if (elapsed >= maxWait) {
+        throw new Error('Apify run timed out after 60s')
+      }
+
+      // Get results
+      const itemsRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${apiToken}&limit=1`
+      )
+      const items = await itemsRes.json()
+      const linkedin = items[0]
+
+      if (!linkedin) {
+        throw new Error('Apify returned no data for LinkedIn profile')
+      }
+
+      console.log(`✅ [DataGathering] LinkedIn data collected via Apify`)
+      console.log(`   - Name: ${linkedin.name || 'N/A'}`)
+      console.log(`   - Experience: ${linkedin.experience?.length || 0} roles`)
+      console.log(`   - Education: ${linkedin.education?.length || 0} schools`)
+      console.log(`   - Skills: ${linkedin.skills?.length || 0} skills`)
+
+      return {
+        success: true,
+        data: linkedin,
+        metadata: {
+          tentativo: 1,
+          tempo_ms: Date.now() - startTime,
+          fonte: 'Apify',
+        },
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error(`❌ [DataGathering] ScrapCreators LinkedIn failed: ${errorMessage}`)
+      console.error(`❌ [DataGathering] Apify LinkedIn failed: ${errorMessage}`)
 
       return {
         success: false,
         error: {
           code: 'NOT_FOUND' as any,
-          message: `LinkedIn profile unavailable: ${errorMessage}. Will use XAI Live Search for enrichment.`,
+          message: `LinkedIn profile unavailable: ${errorMessage}. Will use web search for enrichment.`,
           retryable: false,
         },
         metadata: {
           tentativo: 1,
           tempo_ms: Date.now() - startTime,
-          fonte: 'ScrapCreators (failed)',
+          fonte: 'Apify (failed)',
         },
       }
-    }
-
-    // ScrapCreators returned null (no data extracted)
-    return {
-      success: false,
-      error: {
-        code: 'NOT_FOUND' as any,
-        message: 'LinkedIn profile extraction returned no data. Profile may be private or restricted. Will use XAI Live Search for enrichment.',
-        retryable: false,
-      },
-      metadata: {
-        tentativo: 1,
-        tempo_ms: Date.now() - startTime,
-        fonte: 'ScrapCreators (no data)',
-      },
     }
   }
 
@@ -367,13 +401,13 @@ export class DataGatheringCoordinator {
 
   /**
    * Scrape Instagram profile
-   * NEW STRATEGY: Execute BOTH ScrapCreators + Puppeteer in PARALLEL for maximum data completeness
-   * Merge results to get the richest dataset possible
+   * STRATEGY: Use Apify apify~instagram-profile-scraper (async with polling)
    */
   private async scrapeInstagram(
     url: string
   ): Promise<ScraperResult<InstagramProfileData>> {
     const startTime = Date.now()
+    const apiToken = process.env.APIFY_API_TOKEN
 
     // Extract Instagram handle from URL
     const handleMatch = url.match(/instagram\.com\/([^/?]+)/)
@@ -395,59 +429,108 @@ export class DataGatheringCoordinator {
       }
     }
 
-    console.log(`[DataGathering] 🚀 Launching PARALLEL Instagram scraping: @${handle}`)
+    console.log(`[DataGathering] 🚀 Launching Instagram scraping via Apify: @${handle}`)
 
-    // Try ScrapCreators API only
+    if (!apiToken) {
+      return {
+        success: false,
+        error: {
+          code: 'NOT_CONFIGURED' as any,
+          message: 'APIFY_API_TOKEN not configured',
+          retryable: false,
+        },
+        metadata: { tentativo: 1, tempo_ms: Date.now() - startTime, fonte: 'Apify (not configured)' },
+      }
+    }
+
     try {
-      if (!this.scrapCreators.isEnabled()) {
-        throw new Error('ScrapCreators API not enabled')
+      // Start Apify run
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/runs?token=${apiToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernames: [handle] }),
+        }
+      )
+
+      if (!runRes.ok) {
+        throw new Error(`Apify start failed: ${runRes.status} ${runRes.statusText}`)
       }
 
-      const scrapCreatorsData = await this.scrapCreators.scrapeInstagram(handle)
+      const { data: { id: runId } } = await runRes.json()
 
-      if (scrapCreatorsData) {
-        console.log(`✅ [DataGathering] Instagram data collected from ScrapCreators`)
-        console.log(`   - Followers: ${scrapCreatorsData.followers || 0}`)
-        console.log(`   - Posts: ${scrapCreatorsData.posts_count || 0}`)
-        console.log(`   - Bio: ${scrapCreatorsData.bio ? 'Yes' : 'No'}`)
+      // Poll until finished (max 60s, poll every 3s)
+      const maxWait = 60000
+      const pollInterval = 3000
+      let elapsed = 0
 
-        // Normalize from InstagramScrapedData to InstagramProfileData format
-        const normalizedData = {
-          username: scrapCreatorsData.username || handle,
-          nome_completo: scrapCreatorsData.full_name || '',
-          bio: scrapCreatorsData.bio || '',
-          numero_followers: scrapCreatorsData.followers || 0,
-          numero_following: scrapCreatorsData.following || 0,
-          numero_post: scrapCreatorsData.posts_count || 0,
-          verified: scrapCreatorsData.is_verified || false,
-          business_account: scrapCreatorsData.is_business || false,
-          business_email: scrapCreatorsData.business_email || undefined,
-          business_phone: scrapCreatorsData.business_phone || undefined,
-          category: scrapCreatorsData.category || undefined,
-          website: scrapCreatorsData.external_url || undefined,
-          post_recenti: scrapCreatorsData.recent_posts || [],
-          profile_pic_url: scrapCreatorsData.profile_pic_hd || '',
-          profile_url: `https://www.instagram.com/${handle}`,
-          brand_identificati: [],
-          luoghi_identificati: [],
-          attivita_identificate: [],
-          data_scraping: new Date().toISOString(),
-          fonte: 'instagram',
+      while (elapsed < maxWait) {
+        const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apiToken}`)
+        const { data } = await statusRes.json()
+
+        if (data.status === 'SUCCEEDED') break
+        if (data.status === 'FAILED' || data.status === 'ABORTED') {
+          throw new Error(`Apify run ${data.status}`)
         }
 
-        return {
-          success: true,
-          data: normalizedData as any,
-          metadata: {
-            tentativo: 1,
-            tempo_ms: Date.now() - startTime,
-            fonte: 'ScrapCreators',
-          },
-        }
+        await new Promise(r => setTimeout(r, pollInterval))
+        elapsed += pollInterval
       }
 
-      throw new Error('ScrapCreators returned no data')
+      if (elapsed >= maxWait) {
+        throw new Error('Apify run timed out after 60s')
+      }
 
+      // Get results
+      const itemsRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${apiToken}&limit=1`
+      )
+      const items = await itemsRes.json()
+      const igData = items[0]
+
+      if (!igData) {
+        throw new Error('Apify returned no data for Instagram profile')
+      }
+
+      console.log(`✅ [DataGathering] Instagram data collected via Apify`)
+      console.log(`   - Followers: ${igData.followersCount || 0}`)
+      console.log(`   - Posts: ${igData.postsCount || 0}`)
+      console.log(`   - Bio: ${igData.biography ? 'Yes' : 'No'}`)
+
+      // Normalize from Apify format to InstagramProfileData
+      const normalizedData = {
+        username: igData.username || handle,
+        nome_completo: igData.fullName || '',
+        bio: igData.biography || '',
+        numero_followers: igData.followersCount || 0,
+        numero_following: igData.followsCount || 0,
+        numero_post: igData.postsCount || 0,
+        verified: igData.isVerified || false,
+        business_account: igData.isBusinessAccount || false,
+        business_email: igData.businessEmail || undefined,
+        business_phone: igData.businessPhoneNumber || undefined,
+        category: igData.categoryName || undefined,
+        website: igData.externalUrl || undefined,
+        post_recenti: [],
+        profile_pic_url: igData.profilePicUrl || igData.profilePicUrlHD || '',
+        profile_url: `https://www.instagram.com/${handle}`,
+        brand_identificati: [],
+        luoghi_identificati: [],
+        attivita_identificate: [],
+        data_scraping: new Date().toISOString(),
+        fonte: 'instagram',
+      }
+
+      return {
+        success: true,
+        data: normalizedData as any,
+        metadata: {
+          tentativo: 1,
+          tempo_ms: Date.now() - startTime,
+          fonte: 'Apify',
+        },
+      }
     } catch (error: any) {
       console.error(`❌ [DataGathering] Instagram scraping failed: ${(error instanceof Error ? error.message : String(error))}`)
 
@@ -455,13 +538,13 @@ export class DataGatheringCoordinator {
         success: false,
         error: {
           code: 'NOT_FOUND' as any,
-          message: `Instagram profile unavailable: ${error instanceof Error ? error.message : String(error)}. Profile may be private or restricted. Will use XAI Live Search for enrichment.`,
+          message: `Instagram profile unavailable: ${error instanceof Error ? error.message : String(error)}. Profile may be private or restricted. Will use web search for enrichment.`,
           retryable: false,
         },
         metadata: {
           tentativo: 1,
           tempo_ms: Date.now() - startTime,
-          fonte: 'ScrapCreators (failed)',
+          fonte: 'Apify (failed)',
         },
       }
     }
@@ -469,78 +552,116 @@ export class DataGatheringCoordinator {
 
 
   /**
-   * Scrape Facebook profile
-   * Uses ScrapCreators API only
+   * Scrape Facebook page/profile
+   * STRATEGY: Use Apify apify~facebook-pages-scraper (async with polling)
    */
   private async scrapeFacebook(
     url: string
   ): Promise<ScraperResult<any>> {
     const startTime = Date.now()
+    const apiToken = process.env.APIFY_API_TOKEN
 
-    console.log(`[DataGathering] 🚀 Launching Facebook scraping: ${url}`)
+    console.log(`[DataGathering] 🚀 Launching Facebook scraping via Apify: ${url}`)
 
-    // Try ScrapCreators API only
+    if (!apiToken) {
+      return {
+        success: false,
+        error: {
+          code: 'NOT_CONFIGURED' as any,
+          message: 'APIFY_API_TOKEN not configured',
+          retryable: false,
+        },
+        metadata: { tentativo: 1, tempo_ms: Date.now() - startTime, fonte: 'Apify (not configured)' },
+      }
+    }
+
     try {
-      if (!this.scrapCreators.isEnabled()) {
-        throw new Error('ScrapCreators API not enabled')
+      // Start Apify run
+      const runRes = await fetch(
+        `https://api.apify.com/v2/acts/apify~facebook-pages-scraper/runs?token=${apiToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startUrls: [{ url }] }),
+        }
+      )
+
+      if (!runRes.ok) {
+        throw new Error(`Apify start failed: ${runRes.status} ${runRes.statusText}`)
       }
 
-      const scrapCreatorsData = await this.scrapCreators.scrapeFacebook(url)
+      const { data: { id: runId } } = await runRes.json()
 
-      // Check if data is actually present (not empty object or null)
-      // FIXED: Use correct field names from API response
-      const hasValidData = scrapCreatorsData &&
-        scrapCreatorsData.name &&
-        (scrapCreatorsData.id || scrapCreatorsData.followerCount || scrapCreatorsData.likeCount)
+      // Poll until finished (max 60s, poll every 3s)
+      const maxWait = 60000
+      const pollInterval = 3000
+      let elapsed = 0
 
-      if (hasValidData) {
-        console.log(`✅ [DataGathering] Facebook data collected from ScrapCreators`)
-        console.log(`   - Name: ${scrapCreatorsData.name || 'N/A'}`)
-        console.log(`   - Followers: ${scrapCreatorsData.followerCount || 'N/A'}`)
-        console.log(`   - Category: ${scrapCreatorsData.category || 'N/A'}`)
-        console.log(`   - Location: ${scrapCreatorsData.location || 'N/A'}`)
-        console.log(`   - About: ${scrapCreatorsData.about ? 'Yes' : 'No'}`)
-        console.log(`   - Raw data keys: ${Object.keys(scrapCreatorsData).join(', ')}`)
+      while (elapsed < maxWait) {
+        const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apiToken}`)
+        const { data } = await statusRes.json()
 
-        // FIXED: Normalize data format with correct field names from API
-        // ScrapeCreators returns data directly in response (not in data.data)
-        const normalizedData = {
-          nome: scrapCreatorsData.name || '',
-          bio: scrapCreatorsData.about || scrapCreatorsData.message || '', // "Profile is private" message if no bio
-          numero_followers: scrapCreatorsData.followerCount || 0,
-          numero_likes: scrapCreatorsData.likeCount || 0,
-          verificato: scrapCreatorsData.isVerified || false,
-          account_status: scrapCreatorsData.account_status || 'public', // "private" or "public"
-          gender: scrapCreatorsData.gender || '',
-          facebook_id: scrapCreatorsData.id || '',
-          categoria: scrapCreatorsData.category || '',
-          citta: scrapCreatorsData.location || '',
-          profile_pic_url: scrapCreatorsData.profilePicLarge || scrapCreatorsData.profilePicMedium || '',
-          cover_photo: scrapCreatorsData.coverPhoto || null,
-          email: scrapCreatorsData.email || '',
-          telefono: scrapCreatorsData.phoneNumber || '',
-          indirizzo: scrapCreatorsData.address || '',
-          website: scrapCreatorsData.website || '',
-          links: scrapCreatorsData.links || [],
-          is_business: scrapCreatorsData.isBusinessPageActive || false,
-          rating_count: scrapCreatorsData.ratingCount || 0,
+        if (data.status === 'SUCCEEDED') break
+        if (data.status === 'FAILED' || data.status === 'ABORTED') {
+          throw new Error(`Apify run ${data.status}`)
         }
 
-        return {
-          success: true,
-          data: normalizedData,
-          metadata: {
-            tentativo: 1,
-            tempo_ms: Date.now() - startTime,
-            fonte: 'ScrapCreators',
-          },
-        }
+        await new Promise(r => setTimeout(r, pollInterval))
+        elapsed += pollInterval
       }
 
-      // Log raw response for debugging
-      console.log('[DataGathering] 🔍 Facebook raw response:', JSON.stringify(scrapCreatorsData, null, 2))
-      throw new Error(`ScrapCreators returned no data or empty data. Keys found: ${scrapCreatorsData ? Object.keys(scrapCreatorsData).join(', ') : 'null'}`)
+      if (elapsed >= maxWait) {
+        throw new Error('Apify run timed out after 60s')
+      }
 
+      // Get results
+      const itemsRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${apiToken}&limit=1`
+      )
+      const items = await itemsRes.json()
+      const fbData = items[0]
+
+      if (!fbData) {
+        throw new Error('Apify returned no data for Facebook page')
+      }
+
+      console.log(`✅ [DataGathering] Facebook data collected via Apify`)
+      console.log(`   - Name: ${fbData.name || fbData.title || 'N/A'}`)
+      console.log(`   - Followers: ${fbData.followersCount || fbData.likes || 'N/A'}`)
+      console.log(`   - Category: ${fbData.categories?.join(', ') || fbData.category || 'N/A'}`)
+
+      // Normalize from Apify format
+      const normalizedData = {
+        nome: fbData.name || fbData.title || '',
+        bio: fbData.about || fbData.description || '',
+        numero_followers: fbData.followersCount || fbData.likes || 0,
+        numero_likes: fbData.likes || fbData.followersCount || 0,
+        verificato: fbData.isVerified || false,
+        account_status: 'public',
+        gender: '',
+        facebook_id: fbData.id || '',
+        categoria: fbData.categories?.join(', ') || fbData.category || '',
+        citta: fbData.address?.city || fbData.city || '',
+        profile_pic_url: fbData.profilePhoto || '',
+        cover_photo: fbData.coverPhoto || null,
+        email: fbData.email || '',
+        telefono: fbData.phone || '',
+        indirizzo: fbData.address?.street ? `${fbData.address.street}, ${fbData.address.city || ''}` : '',
+        website: fbData.website || '',
+        links: [],
+        is_business: !!(fbData.categories?.length),
+        rating_count: fbData.reviewsCount || 0,
+      }
+
+      return {
+        success: true,
+        data: normalizedData,
+        metadata: {
+          tentativo: 1,
+          tempo_ms: Date.now() - startTime,
+          fonte: 'Apify',
+        },
+      }
     } catch (error: any) {
       console.error(`❌ [DataGathering] Facebook scraping failed: ${error instanceof Error ? error.message : String(error)}`)
 
@@ -548,13 +669,13 @@ export class DataGatheringCoordinator {
         success: false,
         error: {
           code: 'NOT_FOUND' as any,
-          message: `Facebook profile unavailable: ${error instanceof Error ? error.message : String(error)}. Profile may be private or restricted. Will use XAI Live Search for enrichment.`,
+          message: `Facebook profile unavailable: ${error instanceof Error ? error.message : String(error)}. Profile may be private or restricted. Will use web search for enrichment.`,
           retryable: false,
         },
         metadata: {
           tentativo: 1,
           tempo_ms: Date.now() - startTime,
-          fonte: 'ScrapCreators (failed)',
+          fonte: 'Apify (failed)',
         },
       }
     }

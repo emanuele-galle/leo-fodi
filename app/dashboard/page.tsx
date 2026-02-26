@@ -17,9 +17,24 @@ import {
   ArrowRight,
   Settings,
   FileText,
+  Clock,
+  User,
 } from 'lucide-react'
 import { EuroIcon } from '@/components/ui/euro-icon'
 import { useAuth } from '@/components/auth/AuthProvider'
+
+interface RecentProfile {
+  id: string
+  clientName: string
+  date: string
+}
+
+interface RecentPlan {
+  id: string
+  profileId: string
+  clientName: string
+  date: string
+}
 
 interface DashboardStats {
   totalClients: number
@@ -27,6 +42,9 @@ interface DashboardStats {
   totalFinancialPlans: number
   totalLeads: number
   pendingUsers: number
+  recentProfiles: RecentProfile[]
+  recentPlans: RecentPlan[]
+  weeklyAICost: number
 }
 
 export default function DashboardPage() {
@@ -38,6 +56,9 @@ export default function DashboardPage() {
     totalFinancialPlans: 0,
     totalLeads: 0,
     pendingUsers: 0,
+    recentProfiles: [],
+    recentPlans: [],
+    weeklyAICost: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -66,6 +87,9 @@ export default function DashboardPage() {
         totalFinancialPlans: data.totalFinancialPlans || 0,
         totalLeads: data.totalLeads || 0,
         pendingUsers: data.pendingUsers || 0,
+        recentProfiles: data.recentProfiles || [],
+        recentPlans: data.recentPlans || [],
+        weeklyAICost: data.weeklyAICost || 0,
       })
     } catch (error) {
       console.error('Error loading dashboard stats:', error)
@@ -266,6 +290,104 @@ export default function DashboardPage() {
                   </Link>
                 )
               })}
+            </div>
+          </div>
+
+          {/* Activity Feed */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Clock className="h-6 w-6 text-[#115A23]" strokeWidth={2.5} />
+              Attivita Recente
+            </h2>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Recent OSINT Profiles */}
+              <Card className="border-2 shadow-natural">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <User className="h-5 w-5 text-[#91BDE2]" strokeWidth={2.5} />
+                    Ultimi Profili OSINT
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <p className="text-sm text-muted-foreground">Caricamento...</p>
+                  ) : stats.recentProfiles.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nessun profilo recente</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {stats.recentProfiles.map((profile) => (
+                        <li key={profile.id}>
+                          <Link
+                            href={`/osint-profiler/${profile.id}`}
+                            className="flex items-center justify-between group hover:bg-muted/50 rounded-lg px-3 py-2 -mx-3 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#91BDE2] to-[#0693e3] flex items-center justify-center">
+                                <User className="h-4 w-4 text-white" strokeWidth={2.5} />
+                              </div>
+                              <span className="text-sm font-medium text-foreground">{profile.clientName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(profile.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </span>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recent Financial Plans */}
+              <Card className="border-2 shadow-natural">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#B15082]" strokeWidth={2.5} />
+                    Ultimi Piani Finanziari
+                  </CardTitle>
+                  {stats.weeklyAICost > 0 && (
+                    <CardDescription className="text-xs flex items-center gap-1">
+                      <Activity className="h-3 w-3" />
+                      Costo AI questa settimana: {stats.weeklyAICost.toFixed(2)}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <p className="text-sm text-muted-foreground">Caricamento...</p>
+                  ) : stats.recentPlans.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nessun piano recente</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {stats.recentPlans.map((plan) => (
+                        <li key={plan.id}>
+                          <Link
+                            href={`/financial-planner/${plan.profileId}`}
+                            className="flex items-center justify-between group hover:bg-muted/50 rounded-lg px-3 py-2 -mx-3 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#B15082] to-[#FF2E5F] flex items-center justify-center">
+                                <FileText className="h-4 w-4 text-white" strokeWidth={2.5} />
+                              </div>
+                              <span className="text-sm font-medium text-foreground">{plan.clientName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(plan.date).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </span>
+                              <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
 

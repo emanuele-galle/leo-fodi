@@ -45,21 +45,24 @@ export class CareerAnalyzerAgentV2 extends BaseOSINTAgent<CareerProfile> {
       temperature: 0.1,
       max_tokens: 2500,
       priority: 1,
-      system_prompt: `Sei un analista OSINT specializzato in carriere professionali.
+      system_prompt: `<role>Sei un analista OSINT specializzato in carriere professionali. Il tuo obiettivo è estrarre il massimo dettaglio professionale verificabile.</role>
 
-Analizza:
-1. Professione attuale (ruolo, azienda, settore, anzianità)
-2. Storico professionale completo
-3. Competenze chiave e certificazioni
+<instructions>
+1. Analizza la professione attuale: ruolo esatto, azienda, settore, anzianità stimata
+2. Ricostruisci lo storico professionale completo con date e descrizioni
+3. Identifica competenze chiave, certificazioni e formazione rilevante
+4. Stima il livello di seniority: junior/mid/senior/executive/imprenditore con logica esplicita
+5. Assegna confidence_score realistico basato su quantità e qualità delle fonti
+</instructions>
 
-IMPORTANTE:
+<constraints>
 - Usa SOLO dati da LinkedIn, CV pubblici, menzioni aziendali verificabili
-- NON inventare ruoli o aziende
-- Determina livello: junior/mid/senior/executive/imprenditore con logica chiara
+- NON inventare ruoli o aziende mai menzionati nelle fonti
 - Ogni esperienza deve avere periodo e fonte specifica
-- Confidence score basato su fonti verificabili
+- Preferisci valori specifici dedotti logicamente a "non_determinato"
+</constraints>
 
-Rispondi in JSON valido.`,
+<output_format>JSON valido con tutti i campi dello schema richiesto</output_format>`,
     }
     super(config)
   }
@@ -68,15 +71,19 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Analyzing career (Reflect Loop DISABLED for speed)...')
+      this.log('Analyzing career (Reflect Loop active, max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
 
       // ✅ Extract adaptive search strategy from context
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const careerProfile = await this.generateCareerProfile(rawData, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: careerProfile } = await this.reflectLoop.run<CareerProfile>(
+        (feedback) => this.generateCareerProfile(rawData, context.target, adaptiveSearch, feedback),
+        CAREER_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
       this.log(`Career analysis completed in ${executionTime}ms`)
@@ -384,21 +391,24 @@ export class EducationProfilerAgentV2 extends BaseOSINTAgent<EducationProfile> {
       temperature: 0.1,
       max_tokens: 1500,
       priority: 2,
-      system_prompt: `Analista OSINT specializzato in formazione accademica.
+      system_prompt: `<role>Sei un analista OSINT specializzato in formazione accademica. Ricostruisci il percorso educativo con il massimo dettaglio verificabile.</role>
 
-Identifica:
-1. Titolo di studio massimo (diploma, laurea, master, dottorato)
-2. Campo di studio e istituzione
-3. Altri studi e certificazioni
-4. Sintesi del percorso formativo
+<instructions>
+1. Identifica il titolo di studio massimo (diploma, laurea, master, dottorato, MBA)
+2. Determina campo di studio, istituzione e anni di frequenza
+3. Elenca certificazioni professionali e corsi rilevanti
+4. Sintetizza il percorso formativo complessivo
+5. Assegna confidence_score realistico (basso se dati scarsi)
+</instructions>
 
-IMPORTANTE:
+<constraints>
 - Usa SOLO dati da LinkedIn education, bio, CV pubblici
-- NON inventare titoli o università
+- NON inventare titoli o università non menzionati
 - Ogni titolo deve avere fonte specifica
-- Se dati insufficienti, confidence basso
+- Preferisci valori parziali a "non_determinato"
+</constraints>
 
-Rispondi in JSON valido.`,
+<output_format>JSON valido con tutti i campi dello schema richiesto</output_format>`,
     }
     super(config)
   }
@@ -407,13 +417,17 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Profiling education (Reflect Loop DISABLED for speed)...')
+      this.log('Profiling education (Reflect Loop active, max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const eduProfile = await this.generateEducationProfile(rawData, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: eduProfile } = await this.reflectLoop.run<EducationProfile>(
+        (feedback) => this.generateEducationProfile(rawData, context.target, adaptiveSearch, feedback),
+        EDUCATION_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 
@@ -649,23 +663,24 @@ export class LifestyleAnalystAgentV2 extends BaseOSINTAgent<LifestyleProfile> {
       temperature: 0.2,
       max_tokens: 3000,
       priority: 2,
-      system_prompt: `Analista comportamentale OSINT specializzato in lifestyle.
+      system_prompt: `<role>Sei un analista comportamentale OSINT specializzato in lifestyle e interessi. Identifichi pattern autentici da dati social reali.</role>
 
-Analizza:
-1. Hobby e passioni (categoria, frequenza)
-2. Interessi principali
-3. Stile di vita (sportivo, culturale, mondano, familiare)
-4. Viaggi (frequenza, destinazioni, tipo)
-5. Brand preferiti e attività ricorrenti
+<instructions>
+1. Analizza hobby e passioni con frequenza e intensità (category, frequenza)
+2. Identifica interessi principali da contenuti publicati e seguiti
+3. Determina stile di vita dominante: sportivo/culturale/mondano/familiare/avventuroso
+4. Mappa i viaggi: frequenza, destinazioni, tipologia (lusso/backpacker/famiglia)
+5. Identifica brand preferiti e attività ricorrenti da hashtag e mentions
+</instructions>
 
-IMPORTANTE:
+<constraints>
 - Usa SOLO post social, foto, check-in, likes visibili
-- Identifica pattern comportamentali da dati reali
-- NON inventare hobby - servono almeno 2 evidenze per dichiarare un hobby
+- NON inventare hobby: servono almeno 2 evidenze per dichiararlo
 - Ogni hobby/interesse deve avere fonte specifica verificabile
-- QUALITÀ > QUANTITÀ: meglio 1-2 hobby verificati che 5 dedotti senza evidenze
+- QUALITÀ > QUANTITÀ: 1-2 hobby verificati sono meglio di 5 dedotti senza evidenze
+</constraints>
 
-Rispondi in JSON valido.`,
+<output_format>JSON valido con tutti i campi dello schema richiesto</output_format>`,
     }
     super(config)
   }
@@ -674,14 +689,18 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Analyzing lifestyle with Reflect Loop...')
+      this.log('Analyzing lifestyle (Reflect Loop active, max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
       const previousResults = context.previous_results
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const lifestyleProfile = await this.generateLifestyleProfile(rawData, previousResults, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: lifestyleProfile } = await this.reflectLoop.run<LifestyleProfile>(
+        (feedback) => this.generateLifestyleProfile(rawData, previousResults, context.target, adaptiveSearch, feedback),
+        LIFESTYLE_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 
@@ -969,21 +988,23 @@ export class SocialGraphBuilderAgentV2 extends BaseOSINTAgent<SocialGraphProfile
       temperature: 0.1,
       max_tokens: 2000,
       priority: 3,
-      system_prompt: `Analista network OSINT specializzato in social graphs.
+      system_prompt: `<role>Sei un analista network OSINT specializzato in social graph analysis. Mappi la rete di relazioni e influenze di un soggetto.</role>
 
-Mappa:
-1. Dimensione rete sociale (followers, following, engagement)
-2. Connessioni chiave (familiari, amici, colleghi, influencer)
-3. Gruppi e comunità di appartenenza
-4. Influencer seguiti
-5. Pattern di interazione
+<instructions>
+1. Quantifica la rete: followers, following, tasso di engagement
+2. Identifica connessioni chiave: familiari visibili, amici stretti, colleghi, influencer nel settore
+3. Mappa gruppi e comunità: settori, hobby, affiliazioni visibili
+4. Elenca influencer seguiti e interazioni pubbliche rilevanti
+5. Analizza pattern di interazione: con chi interagisce più spesso, chi lo menziona
+</instructions>
 
-IMPORTANTE:
-- Usa SOLO dati pubblici visibili (followers count, following, likes pubblici)
-- NON inventare connessioni se non ci sono evidenze
-- Ogni connessione deve avere fonte specifica
+<constraints>
+- Usa SOLO dati pubblici visibili (followers count, following, likes pubblici, commenti visibili)
+- NON inventare connessioni senza evidenze concrete
+- Ogni connessione deve avere fonte specifica verificabile
+</constraints>
 
-Rispondi in JSON valido.`,
+<output_format>JSON valido con tutti i campi dello schema richiesto</output_format>`,
     }
     super(config)
   }
@@ -992,13 +1013,17 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Building social graph with Reflect Loop...')
+      this.log('Building social graph (Reflect Loop active, max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const socialProfile = await this.generateSocialProfile(rawData, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: socialProfile } = await this.reflectLoop.run<SocialGraphProfile>(
+        (feedback) => this.generateSocialProfile(rawData, context.target, adaptiveSearch, feedback),
+        SOCIAL_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 
@@ -1236,22 +1261,24 @@ export class ContentAnalyzerAgentV2 extends BaseOSINTAgent<ContentAnalysisProfil
       temperature: 0.2,
       max_tokens: 3500,
       priority: 4,
-      system_prompt: `Analista OSINT multimodale specializzato in analisi social media (testo + immagini).
+      system_prompt: `<role>Sei un analista OSINT multimodale specializzato in content analysis social media. Estrai insight da testo, immagini e pattern di pubblicazione.</role>
 
-Analizza:
-1. Post pubblicati (temi, sentiment, frequenza)
-2. Linguaggio e stile comunicazione
-3. Valori emergenti e brand mentions
-4. Location frequenti e persone menzionate
-5. Immagini (luoghi, oggetti, brand visibili)
+<instructions>
+1. Analizza post pubblicati: temi dominanti, sentiment prevalente, frequenza di pubblicazione
+2. Valuta linguaggio e stile comunicativo: formale/informale, tecnico/emozionale, italiano/altro
+3. Identifica valori emergenti, brand mentions e messaggi ricorrenti
+4. Mappa location frequenti, persone menzionate o taggati
+5. Analizza contenuti visivi: luoghi, oggetti, brand visibili nelle foto
+</instructions>
 
-IMPORTANTE:
-- Usa SOLO post e contenuti realmente visibili
-- Identifica pattern, temi ricorrenti, sentiment prevalente
-- NON inventare temi se non ci sono evidenze nei post
-- Ogni tema deve avere fonte specifica (post concreto)
+<constraints>
+- Usa SOLO post e contenuti realmente visibili nelle fonti fornite
+- NON inventare temi senza evidenze concrete nei post
+- Ogni tema deve avere fonte specifica (post/contenuto concreto)
+- Identifica pattern con almeno 2 occorrenze
+</constraints>
 
-Rispondi in JSON valido.`,
+<output_format>JSON valido con tutti i campi dello schema richiesto</output_format>`,
     }
     super(config)
   }
@@ -1260,13 +1287,17 @@ Rispondi in JSON valido.`,
     const startTime = Date.now()
 
     try {
-      this.log('Analyzing content (Reflect Loop DISABLED for speed)...')
+      this.log('Analyzing content (Reflect Loop active, max 1 iteration)...')
 
       const rawData = context.shared_memory?.raw_data
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const contentProfile = await this.generateContentProfile(rawData, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: contentProfile } = await this.reflectLoop.run<ContentAnalysisProfile>(
+        (feedback) => this.generateContentProfile(rawData, context.target, adaptiveSearch, feedback),
+        CONTENT_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 

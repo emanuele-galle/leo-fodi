@@ -25,24 +25,25 @@ export class FamilyInvestigatorAgentV2 extends BaseOSINTAgent<FamilyProfile> {
       temperature: 0.1,
       max_tokens: 2000,
       priority: 1,
-      system_prompt: `Sei un investigatore OSINT specializzato nell'analisi del nucleo familiare.
+      system_prompt: `<role>Sei un investigatore OSINT specializzato nell'analisi del nucleo familiare e della residenza. Ricostruisci la situazione familiare da dati pubblici verificabili.</role>
 
-Il tuo compito è identificare:
-1. Nucleo familiare attuale (coniuge, figli, altri familiari)
-2. Nucleo familiare precedente (ex coniuge, separazioni)
-3. Residenza e quartiere (con indicatori di ricchezza della zona)
+<instructions>
+1. Identifica il nucleo familiare attuale: coniuge/partner, figli con età stimate, altri familiari visibili
+2. Cerca evidenze di situazioni precedenti: divorzi, separazioni, ex partner menzionati
+3. Determina la zona di residenza da foto, check-in, tag e menzioni geografiche
+4. Valuta il tipo di zona: centro storico / periferia / residenziale / esclusiva / suburbana
+5. Elenca indicatori economici della zona: servizi, tipo immobili, prezzi mq stimati, reputazione quartiere
+</instructions>
 
-ISTRUZIONI CRITICHE:
-- Analizza SOLO dati pubblici da social media, profili LinkedIn, post
-- Cerca menzioni di familiari, foto di famiglia, tag, dediche
-- Identifica la zona di residenza da foto, check-in, menzioni
-- Valuta il tipo di zona: centro/periferia/residenziale/esclusiva
-- Elenca indicatori di ricchezza: servizi zona, tipo immobili, prezzi mq
-- IMPORTANTE: NON inventare dati - se non trovi info, usa null o "Non disponibile"
+<constraints>
+- Analizza SOLO dati pubblici da social media, profili LinkedIn, post visibili
+- Cerca menzioni di familiari, foto di famiglia, tag, dediche pubbliche
+- NON inventare dati: se info non disponibile, usa null
 - Ogni informazione DEVE avere fonte specifica tracciabile
-- Assegna confidence score 0-100 basato su quantità/qualità fonti
+- Assegna confidence_score 0-100 basato su quantità/qualità fonti
+</constraints>
 
-Rispondi SEMPRE in JSON valido con questa struttura esatta.`,
+<output_format>JSON valido con la struttura esatta richiesta dallo schema</output_format>`,
     }
     super(config)
   }
@@ -51,14 +52,18 @@ Rispondi SEMPRE in JSON valido con questa struttura esatta.`,
     const startTime = Date.now()
 
     try {
-      this.log('Starting family investigation (Reflect Loop DISABLED for speed)...')
+      this.log('Starting family investigation (Reflect Loop active, max 1 iteration)...')
 
       // Estrai dati da raw_data (Fase 0 scraping)
       const rawData = context.shared_memory?.raw_data
       const adaptiveSearch = this.getAdaptiveSearchStrategy(context)
 
-      // REFLECT LOOP DISABLED - Direct generation for speed
-      const familyProfile = await this.generateFamilyProfile(rawData, context.target, adaptiveSearch)
+      const targetName = `${context.target.nome} ${context.target.cognome}`
+      const { output: familyProfile } = await this.reflectLoop.run<FamilyProfile>(
+        (feedback) => this.generateFamilyProfile(rawData, context.target, adaptiveSearch, feedback),
+        FAMILY_RUBRIC,
+        { maxIterations: 1, targetName }
+      )
 
       const executionTime = Date.now() - startTime
 

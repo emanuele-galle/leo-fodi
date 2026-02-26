@@ -3,7 +3,7 @@
  * Handles financial plan creation and database operations
  */
 
-import type { FinancialPlan, OSINTProfile, ObiettiviFinanziari, AnalisiGap, SequenzaItem, SpuntiFiscali, RaccomandazioneProdottoFinanziario, SintesiValore } from '@/lib/types'
+import type { FinancialPlan, OSINTProfile, ObiettiviFinanziari, AnalisiGap, SequenzaItem, SpuntiFiscali, RaccomandazioneProdottoFinanziario, SintesiValore, TriggerVita, PrioritaContatto } from '@/lib/types'
 import { prisma } from '@/lib/db'
 import {
   callAI,
@@ -37,7 +37,7 @@ export async function generateFinancialPlan(
 
     const response = await callAI(messages, {
       temperature: 0.7,
-      maxTokens: 4096,
+      maxTokens: 8192,
       responseFormat: 'json_object',
     })
 
@@ -58,7 +58,7 @@ export async function generateFinancialPlan(
       profileId,
       requestParams: {
         temperature: 0.7,
-        max_tokens: 4096,
+        max_tokens: 8192,
         client_name: profile.identita_presenza_online.nome_completo,
       },
       responseSummary: {
@@ -140,6 +140,12 @@ export async function saveFinancialPlan(
   userId?: string
 ): Promise<string> {
   try {
+    const sintesiValoreExtended = {
+      ...plan.sintesi_valore,
+      ...(plan.trigger_vita && { trigger_vita: plan.trigger_vita }),
+      ...(plan.priorita_contatto && { priorita_contatto: plan.priorita_contatto }),
+    }
+
     const savedPlan = await prisma.financialPlan.create({
       data: {
         profileId,
@@ -149,7 +155,7 @@ export async function saveFinancialPlan(
         sequenzaRaccomandata: plan.sequenza_raccomandata as any,
         spuntiFiscali: plan.spunti_fiscali as any,
         raccomandazioniProdotti: plan.raccomandazioni_prodotti as any,
-        sintesiValore: plan.sintesi_valore as any,
+        sintesiValore: sintesiValoreExtended as any,
       },
     })
 
@@ -174,13 +180,18 @@ export async function getFinancialPlan(
 
     if (!planRow) return null
 
+    const sintesiRaw = planRow.sintesiValore as Record<string, unknown>
+    const { trigger_vita, priorita_contatto, ...sintesiCore } = sintesiRaw
+
     const plan: FinancialPlan = {
       obiettivi_finanziari: planRow.obiettiviFinanziari as unknown as ObiettiviFinanziari,
       analisi_gap: planRow.analisiGap as unknown as AnalisiGap,
       sequenza_raccomandata: planRow.sequenzaRaccomandata as unknown as SequenzaItem[],
       spunti_fiscali: planRow.spuntiFiscali as unknown as SpuntiFiscali,
       raccomandazioni_prodotti: planRow.raccomandazioniProdotti as unknown as RaccomandazioneProdottoFinanziario[],
-      sintesi_valore: planRow.sintesiValore as unknown as SintesiValore,
+      sintesi_valore: sintesiCore as unknown as SintesiValore,
+      ...(trigger_vita && { trigger_vita: trigger_vita as unknown as TriggerVita[] }),
+      ...(priorita_contatto && { priorita_contatto: priorita_contatto as unknown as PrioritaContatto }),
     }
 
     return plan
@@ -218,6 +229,12 @@ export async function updateFinancialPlan(
   plan: FinancialPlan
 ): Promise<void> {
   try {
+    const sintesiValoreExtended = {
+      ...plan.sintesi_valore,
+      ...(plan.trigger_vita && { trigger_vita: plan.trigger_vita }),
+      ...(plan.priorita_contatto && { priorita_contatto: plan.priorita_contatto }),
+    }
+
     await prisma.financialPlan.update({
       where: { profileId },
       data: {
@@ -226,7 +243,7 @@ export async function updateFinancialPlan(
         sequenzaRaccomandata: plan.sequenza_raccomandata as any,
         spuntiFiscali: plan.spunti_fiscali as any,
         raccomandazioniProdotti: plan.raccomandazioni_prodotti as any,
-        sintesiValore: plan.sintesi_valore as any,
+        sintesiValore: sintesiValoreExtended as any,
       },
     })
 

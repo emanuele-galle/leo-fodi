@@ -58,12 +58,53 @@ export async function enrichLeadWithAI(lead: Lead): Promise<Lead> {
       enrichedLead.affidabilita_score = Math.min(currentScore + 10, 100)
     }
 
-    console.log(`[AI-Enrichment] ✅ Enriched with ${enrichment.referenti.length} referenti`)
+    // Calculate lead score
+    enrichedLead.extra_data = {
+      ...(enrichedLead.extra_data || {}),
+      lead_score: calculateLeadScore(lead, enrichment),
+    }
+
+    console.log(`[AI-Enrichment] ✅ Enriched with ${enrichment.referenti.length} referenti, score: ${enrichedLead.extra_data.lead_score}`)
     return enrichedLead
   } catch (error) {
     console.error(`[AI-Enrichment] Error enriching ${lead.ragione_sociale}:`, error)
     return lead // Return original lead if enrichment fails
   }
+}
+
+/**
+ * Calculate lead quality score (0-100)
+ */
+function calculateLeadScore(lead: Lead, enrichment: EnrichmentResult): number {
+  let score = 0
+
+  // Email presente (+25)
+  if (enrichment.email_principale || lead.email_principale) score += 25
+
+  // Website presente (+15)
+  if (lead.sito_web) score += 15
+
+  // Numero di dipendenti (+10 se >10, +5 se 1-10, +15 se >50)
+  const employees = lead.dipendenti || 0
+  if (employees > 50) score += 15
+  else if (employees > 10) score += 10
+  else if (employees > 0) score += 5
+
+  // Settore target per assicurazioni
+  const targetSectors = ['assicurazioni', 'finanza', 'immobiliare', 'medico', 'legale', 'tecnologia', 'consulenza', 'servizi_professionali', 'edilizia', 'commercio']
+  const sector = (lead.settore || '').toLowerCase()
+  if (targetSectors.some(s => sector.includes(s))) score += 20
+
+  // Telefono presente (+10)
+  if (lead.telefono_principale || enrichment.telefono_mobile) score += 10
+
+  // LinkedIn presente (+5)
+  if (enrichment.linkedin_url || lead.linkedin_url) score += 5
+
+  // Referenti trovati (+10)
+  if (enrichment.referenti && enrichment.referenti.length > 0) score += 10
+
+  return Math.min(score, 100)
 }
 
 /**
