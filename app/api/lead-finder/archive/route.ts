@@ -10,10 +10,11 @@ export async function GET() {
     }
 
     const userId = session.user.id
-    const userRole = (session.user as any)?.role
+    const userRole = (session.user as { role?: string })?.role
     const isAdmin = userRole === 'admin'
 
     const searches = await prisma.leadSearch.findMany({
+      where: isAdmin ? {} : { userId },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

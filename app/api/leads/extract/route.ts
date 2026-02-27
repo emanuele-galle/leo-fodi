@@ -109,8 +109,16 @@ export async function POST(request: NextRequest) {
     })
 
     // Start extraction worker asynchronously (don't wait)
-    extractLeadsWorker(searchRecord.id, searchParams).catch((error) => {
+    extractLeadsWorker(searchRecord.id, searchParams).catch(async (error) => {
       console.error('Extraction worker error:', error)
+      try {
+        await prisma.leadSearch.update({
+          where: { id: searchRecord.id },
+          data: { status: 'failed' },
+        })
+      } catch (updateError) {
+        console.error('Failed to update search status after worker error:', updateError)
+      }
     })
 
     return NextResponse.json({
@@ -134,6 +142,17 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Get authenticated user
+    const session = await getServerSession()
+    const userId = session?.user?.id
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Non autenticato. Effettua il login per continuare.' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const searchId = searchParams.get('searchId')
 
@@ -144,7 +163,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get search status
+    // Get search status - verify ownership
     const search = await prisma.leadSearch.findUnique({
       where: { id: searchId },
     })
@@ -156,33 +175,61 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get leads for this search
-    const leads = await prisma.lead.findMany({
-      where: { searchId },
-      orderBy: { affidabilitaScore: 'desc' },
+    // IDOR protection: verify the search belongs to this user
+    if (search.userId !== userId) {
+      return NextResponse.json(
+        { error: 'Ricerca non trovata' },
+        { status: 404 }
+      )
+    }
+
+    const { searchParams: urlParams } = new URL(request.url)
+    const page = parseInt(urlParams.get('page') || '1')
+    const limit = Math.min(parseInt(urlParams.get('limit') || '50'), 200)
+    const skip = (page - 1) * limit
+
+    // Get leads for this search with pagination
+    const [leads, totalLeads, aggregation] = await Promise.all([
+      prisma.lead.findMany({
+        where: { searchId },
+        orderBy: { affidabilitaScore: 'desc' },
+        take: limit,
+        skip,
+      }),
+      prisma.lead.count({ where: { searchId } }),
+      prisma.lead.aggregate({
+        where: { searchId },
+        _count: { id: true },
+        _avg: { affidabilitaScore: true },
+      }),
+    ])
+
+    const validatedCount = await prisma.lead.count({
+      where: { searchId, validazioneStatus: 'validated' },
+    })
+    const pendingCount = await prisma.lead.count({
+      where: { searchId, validazioneStatus: 'pending' },
     })
 
-    // TODO: Implement search summary with aggregation if needed
-    const summary = null
+    const summary = {
+      total_leads: totalLeads,
+      validated_leads: validatedCount,
+      pending_leads: pendingCount,
+      invalid_leads: totalLeads - validatedCount - pendingCount,
+      avg_affidabilita: Math.round((aggregation._avg.affidabilitaScore || 0) * 100) / 100,
+    }
 
     const responseData = {
       search,
       leads: leads || [],
-      summary: summary || {
-        total_leads: 0,
-        validated_leads: 0,
-        pending_leads: 0,
-        invalid_leads: 0,
-        avg_affidabilita: 0,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total: totalLeads,
+        totalPages: Math.ceil(totalLeads / limit),
       },
     }
-
-    console.log('📤 GET /api/leads/extract response:', {
-      searchId,
-      searchStatus: search?.status,
-      leadsCount: leads?.length,
-      summaryTotal: 0
-    })
 
     return NextResponse.json(responseData)
   } catch (error) {

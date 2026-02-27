@@ -1,5 +1,7 @@
-import { auth } from '@/lib/auth'
+import { auth, type Session } from '@/lib/auth'
 import { headers } from 'next/headers'
+
+export type { Session }
 
 export async function getServerSession() {
   const session = await auth.api.getSession({
@@ -17,13 +19,14 @@ export async function getServerUserProfile() {
   const session = await getServerSession()
   if (!session?.user) return null
 
+  const user = session.user as Session['user']
   return {
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    role: (session.user as any).role || 'user',
-    approved: (session.user as any).approved || false,
-    createdAt: session.user.createdAt?.toString() || '',
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role || 'user',
+    approved: user.approved || false,
+    createdAt: user.createdAt?.toString() || '',
   }
 }
 

@@ -31,8 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: session.user.id,
         email: session.user.email,
         name: session.user.name,
-        role: (session.user as any).role || 'user',
-        approved: (session.user as any).approved || false,
+        role: (session.user as { role?: string; approved?: boolean }).role || 'user',
+        approved: (session.user as { role?: string; approved?: boolean }).approved || false,
       }
     : null
 

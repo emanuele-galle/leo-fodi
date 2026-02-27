@@ -191,27 +191,10 @@ async function processJobInBackground(jobId: string, target: ProfilingTarget, us
 }
 
 /**
- * Save profile to osint_profiles table
+ * Save profile to osint_profiles table using upsert to prevent race conditions
  */
 async function saveProfileToDatabase(profile: any, userId?: string) {
   try {
-    // 🐛 DEBUG: Log profile structure before saving
-    console.log('\n🔍 [DEBUG] Profile structure before save:')
-    console.log(`   - target: ${profile.target ? 'exists' : 'missing'}`)
-    console.log(`   - family: ${profile.family ? 'exists' : 'missing'}`)
-    console.log(`   - career: ${profile.career ? 'exists' : 'missing'}`)
-    console.log(`   - education: ${profile.education ? 'exists' : 'missing'}`)
-    console.log(`   - lifestyle: ${profile.lifestyle ? 'exists' : 'missing'}`)
-    console.log(`   - wealth: ${profile.wealth ? 'exists' : 'missing'}`)
-    console.log(`   - social_graph: ${profile.social_graph ? 'exists' : 'missing'}`)
-    console.log(`   - content_analysis: ${profile.content_analysis ? 'exists' : 'missing'}`)
-    console.log(`   - work_model: ${profile.work_model ? 'exists' : 'missing'}`)
-    console.log(`   - vision_goals: ${profile.vision_goals ? 'exists' : 'missing'}`)
-    console.log(`   - needs_mapping: ${profile.needs_mapping ? 'exists' : 'missing'}`)
-    console.log(`   - engagement: ${profile.engagement ? 'exists' : 'missing'}`)
-    console.log(`   - rawData: ${profile.rawData ? 'exists' : 'missing'}`)
-    console.log(`   - sintesi_esecutiva length: ${profile.sintesi_esecutiva?.length || 0}`)
-
     const profilePayload = {
       nome: profile.target.nome,
       cognome: profile.target.cognome,
@@ -224,14 +207,11 @@ async function saveProfileToDatabase(profile: any, userId?: string) {
       userId: userId || null,
     }
 
-    const existing = await prisma.osintProfile.findFirst({ where: { targetId: profile.target.id } })
-    if (existing) {
-      await prisma.osintProfile.update({ where: { id: existing.id }, data: profilePayload })
-    } else {
-      await prisma.osintProfile.create({ data: { ...profilePayload, targetId: profile.target.id } })
-    }
-
-    console.log(`[DB] ✅ Profile saved for ${profile.target.nome} ${profile.target.cognome}`)
+    await prisma.osintProfile.upsert({
+      where: { targetId: profile.target.id },
+      update: profilePayload,
+      create: { ...profilePayload, targetId: profile.target.id },
+    })
   } catch (error) {
     console.error('[DB] Failed to save profile:', error)
     throw error

@@ -9,7 +9,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
 
+    const userId = session.user.id
+
     const plans = await prisma.financialPlan.findMany({
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
         profile: {
@@ -57,6 +60,16 @@ export async function DELETE(request: NextRequest) {
 
     if (!planId) {
       return NextResponse.json({ error: 'id richiesto' }, { status: 400 })
+    }
+
+    // Verify ownership before delete
+    const plan = await prisma.financialPlan.findUnique({
+      where: { id: planId },
+      select: { userId: true },
+    })
+
+    if (!plan || plan.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Piano non trovato' }, { status: 404 })
     }
 
     await prisma.financialPlan.delete({

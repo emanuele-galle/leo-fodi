@@ -181,7 +181,7 @@ model OsintJob {
 model OsintProfile {
   id                  String   @id @default(cuid())
   userId              String?  @map("user_id")
-  targetId            String   @map("target_id")
+  targetId            String   @unique @map("target_id")
   nome                String
   cognome             String
   profileData         Json     @map("profile_data")

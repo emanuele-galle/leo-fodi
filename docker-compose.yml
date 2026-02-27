@@ -11,7 +11,7 @@ services:
       - REDIS_URL=redis://vps-panel-redis:6379
       - N8N_INTERNAL_URL=http://vps-panel-n8n:5678
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -9,7 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Non autenticato' }, { status: 401 })
     }
 
-    const userRole = (session.user as any)?.role
+    const userRole = (session.user as { role?: string })?.role
     if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 })
     }
