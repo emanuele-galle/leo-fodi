@@ -11,6 +11,9 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -51,11 +54,13 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.4",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^28.1.0",
