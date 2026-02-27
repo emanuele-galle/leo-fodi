@@ -1450,10 +1450,6 @@ export type LeadUpdatefontiConsultateInput = {
   push?: string | string[]
 }
 
-export type NullableBoolFieldUpdateOperationsInput = {
-  set?: boolean | null
-}
-
 export type LeadCreateNestedOneWithoutContactsInput = {
   create?: Prisma.XOR<Prisma.LeadCreateWithoutContactsInput, Prisma.LeadUncheckedCreateWithoutContactsInput>
   connectOrCreate?: Prisma.LeadCreateOrConnectWithoutContactsInput

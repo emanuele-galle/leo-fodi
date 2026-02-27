@@ -175,6 +175,18 @@ export interface SintesiValore {
   script_appuntamento: string
 }
 
+export interface TriggerVita {
+  evento: string
+  rilevanza: 'alta' | 'media' | 'bassa'
+  opportunita: string
+}
+
+export interface PrioritaContatto {
+  score: number
+  motivo_principale: string
+  gancio_specifico: string
+}
+
 export interface FinancialPlan {
   obiettivi_finanziari: ObiettiviFinanziari
   analisi_gap: AnalisiGap
@@ -182,6 +194,8 @@ export interface FinancialPlan {
   spunti_fiscali: SpuntiFiscali
   raccomandazioni_prodotti: RaccomandazioneProdottoFinanziario[]
   sintesi_valore: SintesiValore
+  trigger_vita?: TriggerVita[]
+  priorita_contatto?: PrioritaContatto
 }
 
 // ============================================

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { Button } from '@/components/ui/button'
 import { OSINTProfileDisplayV4 } from '@/components/profiling/OSINTProfileDisplayV4'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, FileDown } from 'lucide-react'
 
 export default function OSINTProfileDashboardPage() {
   const params = useParams()
@@ -62,7 +62,7 @@ export default function OSINTProfileDashboardPage() {
       <Header />
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <Button
             variant="ghost"
             onClick={() => router.push('/osint-profiler/archivio')}
@@ -71,6 +71,16 @@ export default function OSINTProfileDashboardPage() {
             <ArrowLeft className="h-4 w-4" />
             Torna all'Archivio
           </Button>
+          {profile && !isLoading && !error && (
+            <Button
+              variant="outline"
+              onClick={() => window.open(`/api/export/osint-pdf?profileId=${profileId}`, '_blank')}
+              className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              <FileDown className="h-4 w-4" />
+              Scarica PDF
+            </Button>
+          )}
         </div>
 
         {isLoading && (

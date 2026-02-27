@@ -23,6 +23,7 @@ import {
   User,
   Loader2,
   Trash2,
+  FileDown,
 } from 'lucide-react'
 import {
   AlertDialog,
@@ -307,6 +308,15 @@ export default function FinancialPlannerArchivioPage() {
                             title="Visualizza piano completo"
                           >
                             <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`/api/export/financial-pdf?planId=${plan.id}`, '_blank')}
+                            title="Scarica piano PDF"
+                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          >
+                            <FileDown className="h-3 w-3" />
                           </Button>
                           <Button
                             size="sm"

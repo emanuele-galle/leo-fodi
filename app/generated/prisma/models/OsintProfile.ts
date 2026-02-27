@@ -298,11 +298,11 @@ export type OsintProfileOrderByWithRelationInput = {
 
 export type OsintProfileWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  targetId?: string
   AND?: Prisma.OsintProfileWhereInput | Prisma.OsintProfileWhereInput[]
   OR?: Prisma.OsintProfileWhereInput[]
   NOT?: Prisma.OsintProfileWhereInput | Prisma.OsintProfileWhereInput[]
   userId?: Prisma.StringNullableFilter<"OsintProfile"> | string | null
-  targetId?: Prisma.StringFilter<"OsintProfile"> | string
   nome?: Prisma.StringFilter<"OsintProfile"> | string
   cognome?: Prisma.StringFilter<"OsintProfile"> | string
   profileData?: Prisma.JsonFilter<"OsintProfile">
@@ -314,7 +314,7 @@ export type OsintProfileWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"OsintProfile"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OsintProfile"> | Date | string
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
-}, "id">
+}, "id" | "targetId">
 
 export type OsintProfileOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
